@@ -39,7 +39,7 @@ struct TodayView: View {
                         ForEach(todaysHabits) { habit in
                             HabitRow(habit: habit, accent: accent) {
                                 withAnimation(.snappy) {
-                                    HabitActions.toggleCompletion(for: habit, in: context)
+                                    _ = HabitActions.toggleCompletion(for: habit, in: context)
                                 }
                             }
                         }
