@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import CommitCore
+#if canImport(AppKit)
+import AppKit
+#endif
 
 #if os(macOS)
 /// Compact menu-bar popover: today's habits with quick toggles, a mini graph, and
