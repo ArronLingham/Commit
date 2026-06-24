@@ -2,13 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.app-sandbox</key>
-	<true/>
-	<key>com.apple.security.network.client</key>
-	<true/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.arronlingham.commit</string>
-	</array>
+	<!--
+	  iOS widget entitlements. Empty so it signs with a free Apple ID. App Groups
+	  (needed for the widget to read the app's data on-device) is paid-only; add it
+	  back alongside the app's group when you upgrade.
+	-->
 </dict>
 </plist>

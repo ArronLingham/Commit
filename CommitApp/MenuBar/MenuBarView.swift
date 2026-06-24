@@ -11,7 +11,7 @@ import AppKit
 struct MenuBarView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.openWindow) private var openWindow
-    @Query(filter: #Predicate<Habit> { !$0.isArchived }, sort: \Habit.sortOrder)
+    @Query(filter: #Predicate<Habit> { !$0.isArchived && !$0.isDeleted }, sort: \Habit.sortOrder)
     private var habits: [Habit]
 
     @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)

@@ -9,7 +9,7 @@ enum WidgetData {
     static func fetchHabits() -> [Habit] {
         let context = ModelContext(SharedModelContainer.widget)
         let descriptor = FetchDescriptor<Habit>(
-            predicate: #Predicate { !$0.isArchived },
+            predicate: #Predicate { !$0.isArchived && !$0.isDeleted },
             sortBy: [SortDescriptor(\.sortOrder)]
         )
         return (try? context.fetch(descriptor)) ?? []

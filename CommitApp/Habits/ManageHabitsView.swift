@@ -14,8 +14,8 @@ struct ManageHabitsView: View {
     @State private var editing: Habit?
     @State private var creatingNew = false
 
-    private var active: [Habit] { habits.filter { !$0.isArchived } }
-    private var archived: [Habit] { habits.filter { $0.isArchived } }
+    private var active: [Habit] { habits.filter { !$0.isArchived && !$0.isDeleted } }
+    private var archived: [Habit] { habits.filter { $0.isArchived && !$0.isDeleted } }
 
     var body: some View {
         NavigationStack {
@@ -41,8 +41,10 @@ struct ManageHabitsView: View {
                         ForEach(archived) { habit in
                             row(for: habit)
                                 .swipeActions {
-                                    Button("Restore") { habit.isArchived = false; save() }
-                                        .tint(.green)
+                                    Button("Restore") {
+                                        HabitActions.setArchived(habit, archived: false, in: context)
+                                    }
+                                    .tint(.green)
                                 }
                         }
                         .onDelete { offsets in delete(archived, at: offsets) }
@@ -92,8 +94,10 @@ struct ManageHabitsView: View {
         .buttonStyle(.plain)
         .swipeActions(edge: .trailing) {
             if !habit.isArchived {
-                Button("Archive") { habit.isArchived = true; save() }
-                    .tint(.orange)
+                Button("Archive") {
+                    HabitActions.setArchived(habit, archived: true, in: context)
+                }
+                .tint(.orange)
             }
         }
     }
@@ -103,17 +107,13 @@ struct ManageHabitsView: View {
         reordered.move(fromOffsets: source, toOffset: destination)
         for (index, habit) in reordered.enumerated() {
             habit.sortOrder = index
+            HabitActions.saveEdits(to: habit, in: context)
         }
-        save()
     }
 
     private func delete(_ list: [Habit], at offsets: IndexSet) {
-        for index in offsets { context.delete(list[index]) }
-        save()
-    }
-
-    private func save() {
-        try? context.save()
-        HabitActions.reloadWidgets()
+        for index in offsets {
+            HabitActions.softDelete(list[index], in: context)
+        }
     }
 }

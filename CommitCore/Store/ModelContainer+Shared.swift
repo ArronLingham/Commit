@@ -36,20 +36,17 @@ public enum SharedModelContainer {
             return try! ModelContainer(for: schema, configurations: [config])
         }
 
-        // Preferred: shared App Group store (so the widget can read it).
+        // Cross-device sync is handled by the Firestore SyncEngine, not CloudKit, so the
+        // store is always local. Use the App Group container when available (lets the
+        // widget read it on paid accounts); otherwise fall back to the default store.
+        _ = cloudKit
         if let url = storeURL() {
-            let config = ModelConfiguration(
-                schema: schema,
-                url: url,
-                cloudKitDatabase: cloudKit ? .automatic : .none
-            )
+            let config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
             if let container = try? ModelContainer(for: schema, configurations: [config]) {
                 return container
             }
         }
 
-        // Fallback: local default store (no App Group / CloudKit). Keeps the app usable
-        // without a paid Apple Developer account.
         let fallback = ModelConfiguration(schema: schema, cloudKitDatabase: .none)
         return try! ModelContainer(for: schema, configurations: [fallback])
     }

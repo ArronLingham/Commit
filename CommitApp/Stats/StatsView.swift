@@ -4,7 +4,7 @@ import CommitCore
 
 /// Progress screen: the full contribution graph (month or year) plus headline stats.
 struct StatsView: View {
-    @Query(filter: #Predicate<Habit> { !$0.isArchived }, sort: \Habit.sortOrder)
+    @Query(filter: #Predicate<Habit> { !$0.isArchived && !$0.isDeleted }, sort: \Habit.sortOrder)
     private var habits: [Habit]
 
     @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)

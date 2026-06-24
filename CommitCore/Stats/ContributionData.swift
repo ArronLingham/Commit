@@ -108,12 +108,12 @@ public func makeContributions(
     let gridStart = calendar.startOfWeek(for: primaryStart)
     let gridEnd = calendar.endOfWeek(for: primaryEnd)
 
-    let active = habits.filter { !$0.isArchived }
+    let active = habits.filter { !$0.isArchived && !$0.isDeleted }
     let denom = max(active.count, 1)
 
     var counts: [Date: Int] = [:]
     for habit in active {
-        for completion in habit.completions ?? [] {
+        for completion in habit.completions ?? [] where !completion.isDeleted {
             let day = calendar.startOfDay(for: completion.day)
             if day >= gridStart && day <= gridEnd {
                 counts[day, default: 0] += 1
@@ -148,12 +148,12 @@ public func makeContributions(
 public extension Habit {
     /// Completed days as a set of start-of-day dates.
     func completedDaySet(calendar: Calendar = .current) -> Set<Date> {
-        Set((completions ?? []).map { calendar.startOfDay(for: $0.day) })
+        Set((completions ?? []).filter { !$0.isDeleted }.map { calendar.startOfDay(for: $0.day) })
     }
 
     func isCompleted(on date: Date, calendar: Calendar = .current) -> Bool {
         let day = calendar.startOfDay(for: date)
-        return (completions ?? []).contains { calendar.isDate($0.day, inSameDayAs: day) }
+        return (completions ?? []).contains { !$0.isDeleted && calendar.isDate($0.day, inSameDayAs: day) }
     }
 
     /// Completions within the calendar week containing `date`.

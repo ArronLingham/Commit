@@ -156,8 +156,7 @@ struct HabitEditView: View {
             habit.iconName = iconName
             habit.colorHex = colorHex
             habit.schedule = currentSchedule()
-            try? context.save()
-            HabitActions.reloadWidgets()
+            HabitActions.saveEdits(to: habit, in: context)
         } else {
             let new = HabitActions.addHabit(
                 name: trimmed,

@@ -5,7 +5,7 @@ import CommitCore
 /// Today's habits + a compact recent contribution graph at the top.
 struct TodayView: View {
     @Environment(\.modelContext) private var context
-    @Query(filter: #Predicate<Habit> { !$0.isArchived }, sort: \Habit.sortOrder)
+    @Query(filter: #Predicate<Habit> { !$0.isArchived && !$0.isDeleted }, sort: \Habit.sortOrder)
     private var habits: [Habit]
 
     @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)

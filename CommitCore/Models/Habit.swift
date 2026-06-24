@@ -27,6 +27,11 @@ public final class Habit {
     public var createdAt: Date = Date()
     public var sortOrder: Int = 0
     public var isArchived: Bool = false
+    /// Tombstone for sync: soft-deleted records are kept so deletions propagate
+    /// between devices instead of resurrecting. Filtered out of all queries.
+    public var isDeleted: Bool = false
+    /// Last local modification time; drives last-write-wins merge during sync.
+    public var updatedAt: Date = Date()
 
     @Relationship(deleteRule: .cascade, inverse: \HabitCompletion.habit)
     public var completions: [HabitCompletion]? = []
@@ -45,6 +50,8 @@ public final class Habit {
         self.createdAt = Date()
         self.sortOrder = sortOrder
         self.isArchived = false
+        self.isDeleted = false
+        self.updatedAt = Date()
         self.completions = []
 
         // Encode the schedule into the stored fields explicitly (avoids calling a
