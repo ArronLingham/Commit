@@ -12,7 +12,7 @@ public extension Calendar {
 
     /// Last day of the week containing `date`.
     func endOfWeek(for date: Date) -> Date {
-        date(byAdding: .day, value: 6, to: startOfWeek(for: date)) ?? date
+        self.date(byAdding: .day, value: 6, to: startOfWeek(for: date)) ?? date
     }
 }
 

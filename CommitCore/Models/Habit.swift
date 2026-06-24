@@ -45,7 +45,24 @@ public final class Habit {
         self.createdAt = Date()
         self.sortOrder = sortOrder
         self.isArchived = false
-        self.schedule = schedule
+        self.completions = []
+
+        // Encode the schedule into the stored fields explicitly (avoids calling a
+        // computed-property setter during a SwiftData @Model init).
+        switch schedule {
+        case .daily:
+            self.scheduleRaw = ScheduleKind.daily.rawValue
+            self.weekdays = []
+            self.targetPerWeek = 3
+        case .weekdays(let days):
+            self.scheduleRaw = ScheduleKind.weekdays.rawValue
+            self.weekdays = days.sorted()
+            self.targetPerWeek = 3
+        case .timesPerWeek(let n):
+            self.scheduleRaw = ScheduleKind.timesPerWeek.rawValue
+            self.weekdays = []
+            self.targetPerWeek = max(1, n)
+        }
     }
 }
 
