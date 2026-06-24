@@ -45,6 +45,13 @@ public struct DayContribution: Identifiable, Sendable, Hashable {
     /// Whether the day falls inside the requested range (vs. week-alignment padding).
     public let isInRange: Bool
 
+    public init(date: Date, count: Int, level: Int, isInRange: Bool) {
+        self.date = date
+        self.count = count
+        self.level = level
+        self.isInRange = isInRange
+    }
+
     public var id: Date { date }
 }
 
