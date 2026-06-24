@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  macOS-only entitlements for local runs with a free Apple ID.
+	  iCloud + App Groups are omitted because a free (Personal Team) account
+	  cannot sign them. The app falls back to a local store automatically.
+	  When you enroll in the paid Apple Developer Program, you can point the
+	  macOS build back at Commit.entitlements to re-enable iCloud sync.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>
