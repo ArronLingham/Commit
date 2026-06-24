@@ -1,0 +1,114 @@
+name: Commit
+options:
+  bundleIdPrefix: com.arronlingham
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.10"
+    # Set your Apple Developer Team ID here (or in Xcode's Signing & Capabilities).
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  # ---------------------------------------------------------------------------
+  # Shared framework: models, scheduling, persistence, theme, graph view.
+  # Linked by both the app and the widget so there is one source of truth.
+  # ---------------------------------------------------------------------------
+  CommitCore:
+    type: framework
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - CommitCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.core
+        DEFINES_MODULE: YES
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: NO
+
+  # ---------------------------------------------------------------------------
+  # Main app — single SwiftUI codebase for iOS and macOS.
+  # ---------------------------------------------------------------------------
+  Commit:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - CommitApp
+    dependencies:
+      - target: CommitCore
+        embed: true
+      - target: CommitWidget
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit
+        PRODUCT_NAME: Commit
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: CommitApp/Commit.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_CFBundleDisplayName: Commit
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        # iOS
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        # macOS
+        INFOPLIST_KEY_LSUIElement: NO
+        ENABLE_HARDENED_RUNTIME: YES
+
+  # ---------------------------------------------------------------------------
+  # WidgetKit extension — contribution graph + interactive "today" widget.
+  # ---------------------------------------------------------------------------
+  CommitWidget:
+    type: app-extension
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - CommitWidget
+    dependencies:
+      - target: CommitCore
+        embed: false
+        link: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.widget
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: CommitWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: CommitWidget/CommitWidget.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: Commit
+        ENABLE_HARDENED_RUNTIME: YES
+
+  # ---------------------------------------------------------------------------
+  # Pure-logic unit tests for scheduling + intensity mapping.
+  # ---------------------------------------------------------------------------
+  CommitCoreTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - CommitCoreTests
+    dependencies:
+      - target: CommitCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.coretests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Commit:
+    build:
+      targets:
+        Commit: all
+        CommitWidget: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CommitCoreTests
