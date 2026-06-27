@@ -7,9 +7,20 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 
-# NOTE: The Firebase Swift package is added in a follow-up step (enables sync).
-# Until then the sync code compiles out via `#if canImport(FirebaseFirestore)` and
-# the app runs local-only.
+# Firebase Swift package enables cross-device sync. The sync code is guarded by
+# `#if canImport(FirebaseFirestore)` and stays dormant (app runs local-only) until a
+# `GoogleService-Info.plist` is bundled — so it is safe to add the package before the
+# Firebase console project exists.
+#
+# We're on 11.x (not 10.x): Firebase 10.x declares a macOS 10.13 floor while its own
+# nanopb dependency requires 10.15, which Xcode 26 rejects for the "My Mac" build.
+# Firebase 11 raises the floor to macOS 10.15 / iOS 13 (we target 14 / 17) and folds
+# FirebaseFirestoreSwift's Codable APIs into FirebaseFirestore — so that product is gone
+# here and the `#if canImport(FirebaseFirestoreSwift)` guards compile it out cleanly.
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "11.0.0"
 
 settings:
   base:
@@ -31,6 +42,16 @@ targets:
     supportedDestinations: [iOS, macOS]
     sources:
       - CommitCore
+    dependencies:
+      # Sync backend products. The app embeds CommitCore, so it links these transitively.
+      # If they refuse to link into the framework, move this block to the Commit target.
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseAuth
+      # FirebaseFirestoreSwift is intentionally omitted: it was removed in Firebase 11
+      # (its Codable APIs live in FirebaseFirestore now). FirebaseCore is pulled in
+      # transitively, so the `canImport(FirebaseCore)` guards resolve without listing it.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.core
