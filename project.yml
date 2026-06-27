@@ -58,6 +58,12 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: CommitApp/Commit.entitlements
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": CommitApp/Commit-macOS.entitlements
+        # macOS: ad-hoc "Sign to Run Locally" so the app runs on this Mac with a free
+        # Apple ID — no team, no provisioning profile, no contact with Apple. iOS keeps
+        # automatic signing (base CODE_SIGN_STYLE) for the iPhone's free Personal Team.
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+        "CODE_SIGN_STYLE[sdk=macosx*]": Manual
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": ""
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_CFBundleDisplayName: Commit
@@ -88,6 +94,10 @@ targets:
         INFOPLIST_FILE: CommitWidget/Info.plist
         CODE_SIGN_ENTITLEMENTS: CommitWidget/CommitWidget.entitlements
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": CommitWidget/CommitWidget-macOS.entitlements
+        # macOS: ad-hoc "Sign to Run Locally" (matches the app target — free-account friendly).
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+        "CODE_SIGN_STYLE[sdk=macosx*]": Manual
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": ""
         INFOPLIST_KEY_CFBundleDisplayName: Commit
         ENABLE_HARDENED_RUNTIME: YES
 
