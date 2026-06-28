@@ -21,11 +21,12 @@ struct HomeView: View {
     @State private var newHabitName = ""
     @State private var editing: Habit?
 
+    /// Width of the centred content column; also drives the year graph's fit-to-width sizing.
+    private let contentWidth: CGFloat = 660
+    private var horizontalPadding: CGFloat { 20 }
+
     private var todaysHabits: [Habit] {
         habits.filter { $0.schedule.isScheduled(on: Date()) }
-    }
-    private var completedToday: Int {
-        todaysHabits.filter { $0.isCompleted(on: Date()) }.count
     }
 
     private var contributions: Contributions {
@@ -47,8 +48,8 @@ struct HomeView: View {
                     todaySection
                     quickAdd
                 }
-                .padding(20)
-                .frame(maxWidth: 560)
+                .padding(horizontalPadding)
+                .frame(maxWidth: contentWidth)
                 .frame(maxWidth: .infinity)   // centre the content column
             }
             .navigationTitle("Commit")
@@ -70,50 +71,103 @@ struct HomeView: View {
 
     private var graphSection: some View {
         VStack(spacing: 12) {
-            Text("\(completedToday) of \(todaysHabits.count) completed today")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .center)
-
             graph
-
             ContributionLegend(accent: accent)
         }
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
     private var graph: some View {
         switch span {
-        case .week:
-            weekRow
-        case .month:
-            ContributionGraphView(days: contributions.days, cellSize: 24, accent: accent, showMonthLabels: true)
-                .frame(maxWidth: .infinity, alignment: .center)
-        case .year:
-            ScrollView(.horizontal, showsIndicators: false) {
-                ContributionGraphView(days: contributions.days, cellSize: 11, accent: accent, showMonthLabels: true)
-                    .padding(.vertical, 4)
-            }
+        case .week:  weekRow
+        case .month: monthCalendar
+        case .year:  yearGraph
         }
     }
 
-    /// Week view: the 7 days of the current week as a centred row with weekday initials.
+    /// Week: the 7 days of the current week as a centred row with weekday initials.
     private var weekRow: some View {
-        let symbols = Calendar.current.veryShortWeekdaySymbols // index 0 == Sunday
+        let calendar = Calendar.current
+        let symbols = calendar.veryShortWeekdaySymbols // index 0 == Sunday
         return HStack(spacing: 10) {
             ForEach(contributions.days) { day in
-                let weekdayIndex = Calendar.current.component(.weekday, from: day.date) - 1
+                let weekdayIndex = calendar.component(.weekday, from: day.date) - 1
                 VStack(spacing: 6) {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(day.isInRange
                               ? Theme.cellColor(level: day.level, accent: accent)
                               : Theme.emptyCell.opacity(0.25))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 36, height: 36)
                     Text(symbols.indices.contains(weekdayIndex) ? symbols[weekdayIndex] : "")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    /// Month: a standard calendar grid (weeks as rows, weekday columns) with the full month
+    /// name on one line, weekday headers, and a day number in each in-range cell.
+    private var monthCalendar: some View {
+        let calendar = Calendar.current
+        let cell: CGFloat = 40
+        let spacing: CGFloat = 8
+        let first = calendar.firstWeekday                 // 1 == Sunday
+        let shortSymbols = calendar.veryShortWeekdaySymbols
+        let orderedSymbols = (0..<7).map { shortSymbols[(first - 1 + $0) % 7] }
+        let columns = Array(repeating: GridItem(.fixed(cell), spacing: spacing), count: 7)
+
+        return VStack(spacing: 10) {
+            Text(Date().formatted(.dateTime.month(.wide).year()))
+                .font(.title3.weight(.semibold))
+                .lineLimit(1)
+
+            HStack(spacing: spacing) {
+                ForEach(orderedSymbols.indices, id: \.self) { i in
+                    Text(orderedSymbols[i])
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(width: cell)
+                }
+            }
+
+            LazyVGrid(columns: columns, spacing: spacing) {
+                ForEach(contributions.days) { day in
+                    monthDayCell(day, size: cell, calendar: calendar)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func monthDayCell(_ day: DayContribution, size: CGFloat, calendar: Calendar) -> some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(day.isInRange ? Theme.cellColor(level: day.level, accent: accent) : Color.clear)
+            .frame(width: size, height: size)
+            .overlay {
+                if day.isInRange {
+                    Text("\(calendar.component(.day, from: day.date))")
+                        .font(.caption2)
+                        .foregroundStyle(day.level >= 3 ? Color.white : Color.secondary)
+                }
+            }
+    }
+
+    /// Year: the full ~52-week graph sized to fit the content width — no horizontal scroll.
+    private var yearGraph: some View {
+        let cols = max(1, Int((Double(contributions.days.count) / 7).rounded(.up)))
+        let spacing: CGFloat = 2
+        let usable = contentWidth - horizontalPadding * 2
+        let cell = max(7, ((usable - spacing * CGFloat(cols - 1)) / CGFloat(cols)).rounded(.down))
+        return ContributionGraphView(
+            days: contributions.days,
+            cellSize: cell,
+            spacing: spacing,
+            accent: accent,
+            showMonthLabels: true
+        )
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -136,7 +190,7 @@ struct HomeView: View {
                 ForEach(todaysHabits) { habit in
                     HabitRow(habit: habit, accent: accent) {
                         withAnimation(.snappy) {
-                            _ = HabitActions.toggleCompletion(for: habit, in: context)
+                            HabitActions.complete(habit, in: context)
                         }
                     }
                     .contextMenu {
@@ -180,17 +234,18 @@ struct HomeView: View {
     }
 }
 
-/// A single habit row with an inline complete/incomplete toggle.
+/// A single habit row with an inline complete toggle. Tapping **completes** the habit;
+/// completions can't be undone here (`HabitActions.complete` is idempotent).
 struct HabitRow: View {
     let habit: Habit
     let accent: Color
-    let toggle: () -> Void
+    let complete: () -> Void
 
     private var habitColor: Color { Color(hex: habit.colorHex) ?? accent }
     private var done: Bool { habit.isCompleted(on: Date()) }
 
     var body: some View {
-        Button(action: toggle) {
+        Button(action: complete) {
             HStack(spacing: 12) {
                 Image(systemName: habit.iconName)
                     .font(.title3)

@@ -33,6 +33,13 @@ public struct ContributionGraphView: View {
 
     private var cornerRadius: CGFloat { max(2, cellSize * 0.22) }
 
+    /// Total width of the week-column grid, so the month-label row matches the cells and the
+    /// view keeps an intrinsic width its container can centre.
+    private var gridWidth: CGFloat {
+        let n = CGFloat(weeks.count)
+        return n * cellSize + max(0, n - 1) * spacing
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: spacing * 1.5) {
             if showMonthLabels {
@@ -60,16 +67,36 @@ public struct ContributionGraphView: View {
 
     // MARK: Month labels
 
+    private struct MonthMarker: Identifiable {
+        let column: Int
+        let label: String
+        var id: Int { column }
+    }
+
+    private func monthMarkers() -> [MonthMarker] {
+        var result: [MonthMarker] = []
+        for (idx, week) in weeks.enumerated() {
+            let label = monthLabel(weekIndex: idx, week: week)
+            if !label.isEmpty { result.append(MonthMarker(column: idx, label: label)) }
+        }
+        return result
+    }
+
+    /// Month abbreviations positioned over the week column where each month begins. Drawn in
+    /// a ZStack with horizontal offsets so each label stays on **one line** and can overflow
+    /// into the following (empty) columns instead of wrapping.
     private var monthLabels: some View {
-        HStack(spacing: spacing) {
-            ForEach(Array(weeks.enumerated()), id: \.offset) { idx, week in
-                Text(monthLabel(weekIndex: idx, week: week))
+        let step = cellSize + spacing
+        return ZStack(alignment: .topLeading) {
+            ForEach(monthMarkers()) { marker in
+                Text(marker.label)
                     .font(.system(size: max(7, cellSize * 0.85)))
                     .foregroundStyle(.secondary)
-                    .frame(width: cellSize, alignment: .leading)
                     .fixedSize()
+                    .offset(x: CGFloat(marker.column) * step)
             }
         }
+        .frame(width: gridWidth, height: max(9, cellSize * 0.9), alignment: .topLeading)
     }
 
     /// Show a month abbreviation on the first week column that contains that month's start.
