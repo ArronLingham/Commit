@@ -1,0 +1,232 @@
+import SwiftUI
+import SwiftData
+import CommitCore
+
+/// The app's single page: a centered GitHub-style contribution graph with a Week / Month /
+/// Year switcher (top-right), today's checkable habits, and an inline quick-add field.
+struct HomeView: View {
+    @Environment(\.modelContext) private var context
+    @Query(filter: #Predicate<Habit> { !$0.isArchived && !$0.isDeleted }, sort: \Habit.sortOrder)
+    private var habits: [Habit]
+
+    @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
+    private var accentHex = Theme.defaultAccentHex
+    private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
+
+    enum Span: String, CaseIterable, Identifiable {
+        case week = "Week", month = "Month", year = "Year"
+        var id: String { rawValue }
+    }
+    @State private var span: Span = .month
+    @State private var newHabitName = ""
+    @State private var editing: Habit?
+
+    private var todaysHabits: [Habit] {
+        habits.filter { $0.schedule.isScheduled(on: Date()) }
+    }
+    private var completedToday: Int {
+        todaysHabits.filter { $0.isCompleted(on: Date()) }.count
+    }
+
+    private var contributions: Contributions {
+        let range: ContributionGraphRange
+        switch span {
+        case .week: range = .week(Date())
+        case .month: range = .month(Date())
+        case .year: range = .year(Date())
+        }
+        return makeContributions(habits: habits, range: range)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    graphSection
+                    Divider()
+                    todaySection
+                    quickAdd
+                }
+                .padding(20)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)   // centre the content column
+            }
+            .navigationTitle("Commit")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Picker("Span", selection: $span) {
+                        ForEach(Span.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                }
+            }
+            .sheet(item: $editing) { habit in
+                HabitEditView(habit: habit)
+            }
+        }
+    }
+
+    // MARK: Graph
+
+    private var graphSection: some View {
+        VStack(spacing: 12) {
+            Text("\(completedToday) of \(todaysHabits.count) completed today")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            graph
+
+            ContributionLegend(accent: accent)
+        }
+    }
+
+    @ViewBuilder
+    private var graph: some View {
+        switch span {
+        case .week:
+            weekRow
+        case .month:
+            ContributionGraphView(days: contributions.days, cellSize: 24, accent: accent, showMonthLabels: true)
+                .frame(maxWidth: .infinity, alignment: .center)
+        case .year:
+            ScrollView(.horizontal, showsIndicators: false) {
+                ContributionGraphView(days: contributions.days, cellSize: 11, accent: accent, showMonthLabels: true)
+                    .padding(.vertical, 4)
+            }
+        }
+    }
+
+    /// Week view: the 7 days of the current week as a centred row with weekday initials.
+    private var weekRow: some View {
+        let symbols = Calendar.current.veryShortWeekdaySymbols // index 0 == Sunday
+        return HStack(spacing: 10) {
+            ForEach(contributions.days) { day in
+                let weekdayIndex = Calendar.current.component(.weekday, from: day.date) - 1
+                VStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(day.isInRange
+                              ? Theme.cellColor(level: day.level, accent: accent)
+                              : Theme.emptyCell.opacity(0.25))
+                        .frame(width: 34, height: 34)
+                    Text(symbols.indices.contains(weekdayIndex) ? symbols[weekdayIndex] : "")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    // MARK: Today
+
+    @ViewBuilder
+    private var todaySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Today")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if todaysHabits.isEmpty {
+                ContentUnavailableView(
+                    "Nothing scheduled",
+                    systemImage: "leaf",
+                    description: Text("Add a habit below to start your streak.")
+                )
+            } else {
+                ForEach(todaysHabits) { habit in
+                    HabitRow(habit: habit, accent: accent) {
+                        withAnimation(.snappy) {
+                            _ = HabitActions.toggleCompletion(for: habit, in: context)
+                        }
+                    }
+                    .contextMenu {
+                        Button("Edit…") { editing = habit }
+                        Button("Delete", role: .destructive) {
+                            HabitActions.softDelete(habit, in: context)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Quick add
+
+    private var quickAdd: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "plus.circle.fill").foregroundStyle(accent)
+            TextField("Add a habit…", text: $newHabitName)
+                .textFieldStyle(.plain)
+                .onSubmit(addHabit)
+            Button("Add", action: addHabit)
+                .disabled(newHabitName.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func addHabit() {
+        let trimmed = newHabitName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        _ = HabitActions.addHabit(
+            name: trimmed,
+            iconName: "checkmark.circle",
+            colorHex: accentHex,
+            schedule: .daily,
+            in: context
+        )
+        newHabitName = ""
+    }
+}
+
+/// A single habit row with an inline complete/incomplete toggle.
+struct HabitRow: View {
+    let habit: Habit
+    let accent: Color
+    let toggle: () -> Void
+
+    private var habitColor: Color { Color(hex: habit.colorHex) ?? accent }
+    private var done: Bool { habit.isCompleted(on: Date()) }
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 12) {
+                Image(systemName: habit.iconName)
+                    .font(.title3)
+                    .foregroundStyle(habitColor)
+                    .frame(width: 30)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(habit.name.isEmpty ? "Untitled" : habit.name)
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                    .font(.title2)
+                    .foregroundStyle(done ? habitColor : Color.secondary.opacity(0.6))
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var subtitle: String {
+        var parts: [String] = []
+        let streak = habit.currentStreak()
+        if streak > 0 { parts.append("🔥 \(streak)") }
+        if case .timesPerWeek(let target) = habit.schedule {
+            parts.append("\(habit.weeklyCompletionCount())/\(target) this week")
+        } else {
+            parts.append(habit.schedule.shortDescription())
+        }
+        return parts.joined(separator: " · ")
+    }
+}

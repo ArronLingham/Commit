@@ -11,6 +11,7 @@ struct CommitApp: App {
             RootView()
         }
         .modelContainer(container)
+        .defaultSize(width: 480, height: 660)
 
         #if os(macOS)
         // Quick check-off from the menu bar.

@@ -75,6 +75,8 @@ public enum ContributionGraphRange: Sendable {
     case year(Date)
     /// The trailing `n` weeks ending today.
     case trailingWeeks(Int)
+    /// The calendar week containing the given date.
+    case week(Date)
 
     func bounds(calendar: Calendar, reference: Date) -> (start: Date, end: Date) {
         switch self {
@@ -92,6 +94,8 @@ public enum ContributionGraphRange: Sendable {
             let end = calendar.startOfDay(for: reference)
             let start = calendar.date(byAdding: .day, value: -(max(1, n) * 7 - 1), to: end) ?? end
             return (start, end)
+        case .week(let date):
+            return (calendar.startOfWeek(for: date), calendar.endOfWeek(for: date))
         }
     }
 }
