@@ -94,14 +94,14 @@ struct HomeView: View {
             ForEach(contributions.days) { day in
                 let weekdayIndex = calendar.component(.weekday, from: day.date) - 1
                 VStack(spacing: 6) {
+                    Text(symbols.indices.contains(weekdayIndex) ? symbols[weekdayIndex] : "")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(day.isInRange
                               ? Theme.cellColor(level: day.level, accent: accent)
                               : Theme.emptyCell.opacity(0.25))
                         .frame(width: 36, height: 36)
-                    Text(symbols.indices.contains(weekdayIndex) ? symbols[weekdayIndex] : "")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -135,24 +135,17 @@ struct HomeView: View {
 
             LazyVGrid(columns: columns, spacing: spacing) {
                 ForEach(contributions.days) { day in
-                    monthDayCell(day, size: cell, calendar: calendar)
+                    monthDayCell(day, size: cell)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private func monthDayCell(_ day: DayContribution, size: CGFloat, calendar: Calendar) -> some View {
+    private func monthDayCell(_ day: DayContribution, size: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(day.isInRange ? Theme.cellColor(level: day.level, accent: accent) : Color.clear)
             .frame(width: size, height: size)
-            .overlay {
-                if day.isInRange {
-                    Text("\(calendar.component(.day, from: day.date))")
-                        .font(.caption2)
-                        .foregroundStyle(day.level >= 3 ? Color.white : Color.secondary)
-                }
-            }
     }
 
     /// Year: the full ~52-week graph sized to fit the content width — no horizontal scroll.
@@ -166,7 +159,8 @@ struct HomeView: View {
             cellSize: cell,
             spacing: spacing,
             accent: accent,
-            showMonthLabels: true
+            showMonthLabels: true,
+            excludeCurrentMonthLabel: true
         )
         .frame(maxWidth: .infinity, alignment: .center)
     }

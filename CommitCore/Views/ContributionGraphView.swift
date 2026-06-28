@@ -9,19 +9,24 @@ public struct ContributionGraphView: View {
     public var spacing: CGFloat
     public var accent: Color
     public var showMonthLabels: Bool
+    /// When true, the month label for the current calendar month is omitted (used by the
+    /// year view, whose trailing/leading partial month would otherwise crowd the edge).
+    public var excludeCurrentMonthLabel: Bool
 
     public init(
         days: [DayContribution],
         cellSize: CGFloat = 11,
         spacing: CGFloat = 3,
         accent: Color = Theme.defaultAccent,
-        showMonthLabels: Bool = true
+        showMonthLabels: Bool = true,
+        excludeCurrentMonthLabel: Bool = false
     ) {
         self.days = days
         self.cellSize = cellSize
         self.spacing = spacing
         self.accent = accent
         self.showMonthLabels = showMonthLabels
+        self.excludeCurrentMonthLabel = excludeCurrentMonthLabel
     }
 
     /// Days grouped into week columns (each column is 7 days, top = first weekday).
@@ -74,10 +79,14 @@ public struct ContributionGraphView: View {
     }
 
     private func monthMarkers() -> [MonthMarker] {
+        let calendar = Calendar.current
+        let currentMonthSymbol = calendar.shortMonthSymbols[calendar.component(.month, from: Date()) - 1]
         var result: [MonthMarker] = []
         for (idx, week) in weeks.enumerated() {
             let label = monthLabel(weekIndex: idx, week: week)
-            if !label.isEmpty { result.append(MonthMarker(column: idx, label: label)) }
+            guard !label.isEmpty else { continue }
+            if excludeCurrentMonthLabel && label == currentMonthSymbol { continue }
+            result.append(MonthMarker(column: idx, label: label))
         }
         return result
     }
