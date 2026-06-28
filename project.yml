@@ -2,25 +2,12 @@ name: Commit
 options:
   bundleIdPrefix: com.arronlingham
   deploymentTarget:
-    iOS: "17.0"
     macOS: "14.0"
   createIntermediateGroups: true
   groupSortPosition: top
 
-# Firebase Swift package enables cross-device sync. The sync code is guarded by
-# `#if canImport(FirebaseFirestore)` and stays dormant (app runs local-only) until a
-# `GoogleService-Info.plist` is bundled — so it is safe to add the package before the
-# Firebase console project exists.
-#
-# We're on 11.x (not 10.x): Firebase 10.x declares a macOS 10.13 floor while its own
-# nanopb dependency requires 10.15, which Xcode 26 rejects for the "My Mac" build.
-# Firebase 11 raises the floor to macOS 10.15 / iOS 13 (we target 14 / 17) and folds
-# FirebaseFirestoreSwift's Codable APIs into FirebaseFirestore — so that product is gone
-# here and the `#if canImport(FirebaseFirestoreSwift)` guards compile it out cleanly.
-packages:
-  Firebase:
-    url: https://github.com/firebase/firebase-ios-sdk
-    from: "11.0.0"
+# Local-only macOS app (free Apple ID friendly): no Firebase / no external services.
+# Cross-device sync was removed; the app is a single-device local SwiftData app.
 
 settings:
   base:
@@ -39,19 +26,9 @@ targets:
   # ---------------------------------------------------------------------------
   CommitCore:
     type: framework
-    supportedDestinations: [iOS, macOS]
+    supportedDestinations: [macOS]
     sources:
       - CommitCore
-    dependencies:
-      # Sync backend products. The app embeds CommitCore, so it links these transitively.
-      # If they refuse to link into the framework, move this block to the Commit target.
-      - package: Firebase
-        product: FirebaseFirestore
-      - package: Firebase
-        product: FirebaseAuth
-      # FirebaseFirestoreSwift is intentionally omitted: it was removed in Firebase 11
-      # (its Codable APIs live in FirebaseFirestore now). FirebaseCore is pulled in
-      # transitively, so the `canImport(FirebaseCore)` guards resolve without listing it.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.core
@@ -60,11 +37,11 @@ targets:
         SKIP_INSTALL: NO
 
   # ---------------------------------------------------------------------------
-  # Main app — single SwiftUI codebase for iOS and macOS.
+  # Main app — SwiftUI, macOS only (local-only).
   # ---------------------------------------------------------------------------
   Commit:
     type: application
-    supportedDestinations: [iOS, macOS]
+    supportedDestinations: [macOS]
     sources:
       - CommitApp
     dependencies:
@@ -77,11 +54,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit
         PRODUCT_NAME: Commit
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_ENTITLEMENTS: CommitApp/Commit.entitlements
-        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": CommitApp/Commit-macOS.entitlements
+        CODE_SIGN_ENTITLEMENTS: CommitApp/Commit-macOS.entitlements
         # macOS: ad-hoc "Sign to Run Locally" so the app runs on this Mac with a free
-        # Apple ID — no team, no provisioning profile, no contact with Apple. iOS keeps
-        # automatic signing (base CODE_SIGN_STYLE) for the iPhone's free Personal Team.
+        # Apple ID — no team, no provisioning profile, no contact with Apple.
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
         "CODE_SIGN_STYLE[sdk=macosx*]": Manual
         "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": ""
@@ -89,10 +64,6 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_CFBundleDisplayName: Commit
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
-        # iOS
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
-        # macOS
         INFOPLIST_KEY_LSUIElement: NO
         ENABLE_HARDENED_RUNTIME: YES
 
@@ -101,7 +72,7 @@ targets:
   # ---------------------------------------------------------------------------
   CommitWidget:
     type: app-extension
-    supportedDestinations: [iOS, macOS]
+    supportedDestinations: [macOS]
     sources:
       - CommitWidget
     dependencies:
@@ -113,8 +84,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.widget
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CommitWidget/Info.plist
-        CODE_SIGN_ENTITLEMENTS: CommitWidget/CommitWidget.entitlements
-        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": CommitWidget/CommitWidget-macOS.entitlements
+        CODE_SIGN_ENTITLEMENTS: CommitWidget/CommitWidget-macOS.entitlements
         # macOS: ad-hoc "Sign to Run Locally" (matches the app target — free-account friendly).
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
         "CODE_SIGN_STYLE[sdk=macosx*]": Manual
@@ -127,7 +97,7 @@ targets:
   # ---------------------------------------------------------------------------
   CommitCoreTests:
     type: bundle.unit-test
-    supportedDestinations: [iOS, macOS]
+    supportedDestinations: [macOS]
     sources:
       - CommitCoreTests
     dependencies:

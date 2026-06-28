@@ -2,8 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- macOS-only widget entitlements for free-account local runs (no App Groups). -->
+	<!-- macOS widget: App Sandbox + App Groups to read the shared store (free-account best-effort). -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.arronlingham.commit</string>
+	</array>
 </dict>
 </plist>

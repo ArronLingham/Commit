@@ -4,14 +4,16 @@
 <dict>
 	<!--
 	  macOS-only entitlements for local runs with a free Apple ID.
-	  iCloud + App Groups are omitted because a free (Personal Team) account
-	  cannot sign them. The app falls back to a local store automatically.
-	  When you enroll in the paid Apple Developer Program, you can point the
-	  macOS build back at Commit.entitlements to re-enable iCloud sync.
+	  App Sandbox + App Groups let the widget read the app's SwiftData store via the
+	  shared group container. App Groups under a free / ad-hoc signature may or may not
+	  be honoured by macOS; if it isn't, the menu bar still works and the widget simply
+	  falls back to an empty store. No network entitlement — the app is fully local.
 	-->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.network.client</key>
-	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.arronlingham.commit</string>
+	</array>
 </dict>
 </plist>

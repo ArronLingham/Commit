@@ -6,15 +6,9 @@ import CommitCore
 struct CommitApp: App {
     private let container = SharedModelContainer.shared
 
-    init() {
-        // Configure Firebase if it's set up; no-op otherwise (app stays local-only).
-        SyncBootstrap.configureIfAvailable()
-    }
-
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView()
-                .task { SyncEngine.shared.configure(container: container) }
         }
         .modelContainer(container)
 

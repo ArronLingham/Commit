@@ -28,9 +28,6 @@ Commit.xcodeproj/
 Pods/
 Carthage/Build/
 
-## Firebase config (per-developer secret — bundled locally, never committed)
-GoogleService-Info.plist
-
 ## macOS
 .DS_Store
 

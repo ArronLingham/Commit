@@ -16,10 +16,10 @@ public enum CommitConstants {
 
 /// Builds the SwiftData container backing the app and the widget.
 ///
-/// The store lives in the App Group container so the widget can read it. The app
-/// process owns CloudKit sync; the widget opens the same store read-side without
-/// CloudKit. If the App Group / CloudKit aren't available (e.g. no paid Apple
-/// Developer account yet), it falls back to a plain local store so the app still runs.
+/// The store lives in the App Group container so the widget can read it. If the App
+/// Group isn't available (e.g. macOS doesn't honour the entitlement under free / ad-hoc
+/// signing), it falls back to a plain local store so the app still runs — in that case
+/// the widget can't see the app's data.
 public enum SharedModelContainer {
     public static let schema = Schema([Habit.self, HabitCompletion.self])
 
@@ -36,9 +36,9 @@ public enum SharedModelContainer {
             return try! ModelContainer(for: schema, configurations: [config])
         }
 
-        // Cross-device sync is handled by the Firestore SyncEngine, not CloudKit, so the
-        // store is always local. Use the App Group container when available (lets the
-        // widget read it on paid accounts); otherwise fall back to the default store.
+        // Local-only app: the store is always a plain local store (no CloudKit / no sync).
+        // Use the App Group container when macOS honours the entitlement (lets the widget
+        // read the same store); otherwise fall back to the default per-process store.
         _ = cloudKit
         if let url = storeURL() {
             let config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
