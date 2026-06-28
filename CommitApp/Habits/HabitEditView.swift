@@ -16,6 +16,10 @@ struct HabitEditView: View {
     @State private var scheduleKind: ScheduleKind
     @State private var selectedWeekdays: Set<Int>
     @State private var timesPerWeek: Int
+    @State private var selectedDaysOfMonth: Set<Int>
+    @State private var yearlyMonth: Int
+    @State private var yearlyDay: Int
+    @State private var intervalDays: Int
 
     private static let iconChoices = [
         "checkmark.circle", "figure.run", "book", "drop", "dumbbell",
@@ -41,6 +45,24 @@ struct HabitEditView: View {
         } else {
             _timesPerWeek = State(initialValue: 3)
         }
+        if case .monthly(let days) = schedule {
+            _selectedDaysOfMonth = State(initialValue: days)
+        } else {
+            _selectedDaysOfMonth = State(initialValue: [1])
+        }
+        if case .yearly(let m, let d) = schedule {
+            _yearlyMonth = State(initialValue: m)
+            _yearlyDay = State(initialValue: d)
+        } else {
+            let now = Calendar.current.dateComponents([.month, .day], from: Date())
+            _yearlyMonth = State(initialValue: now.month ?? 1)
+            _yearlyDay = State(initialValue: now.day ?? 1)
+        }
+        if case .everyNDays(let n) = schedule {
+            _intervalDays = State(initialValue: max(2, n))
+        } else {
+            _intervalDays = State(initialValue: 2)
+        }
     }
 
     private var selectedColor: Color { Color(hex: colorHex) ?? Theme.defaultAccent }
@@ -59,6 +81,9 @@ struct HabitEditView: View {
                         Text("Daily").tag(ScheduleKind.daily)
                         Text("Specific days").tag(ScheduleKind.weekdays)
                         Text("Times per week").tag(ScheduleKind.timesPerWeek)
+                        Text("Monthly").tag(ScheduleKind.monthly)
+                        Text("Yearly").tag(ScheduleKind.yearly)
+                        Text("Every N days").tag(ScheduleKind.everyNDays)
                     }
                     .pickerStyle(.menu)
 
@@ -66,6 +91,12 @@ struct HabitEditView: View {
                         weekdayPicker
                     } else if scheduleKind == .timesPerWeek {
                         Stepper("\(timesPerWeek)× per week", value: $timesPerWeek, in: 1...7)
+                    } else if scheduleKind == .monthly {
+                        dayOfMonthPicker
+                    } else if scheduleKind == .yearly {
+                        yearlyPicker
+                    } else if scheduleKind == .everyNDays {
+                        Stepper("Every \(intervalDays) days", value: $intervalDays, in: 2...365)
                     }
                 }
             }
@@ -142,11 +173,46 @@ struct HabitEditView: View {
         }
     }
 
+    private var dayOfMonthPicker: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
+            ForEach(1...31, id: \.self) { day in
+                let isOn = selectedDaysOfMonth.contains(day)
+                Text("\(day)")
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, minHeight: 30)
+                    .background(isOn ? selectedColor.opacity(0.25) : Color.secondary.opacity(0.12))
+                    .foregroundStyle(isOn ? selectedColor : .secondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if isOn { selectedDaysOfMonth.remove(day) } else { selectedDaysOfMonth.insert(day) }
+                    }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var yearlyPicker: some View {
+        let months = Calendar.current.monthSymbols
+        return Group {
+            Picker("Month", selection: $yearlyMonth) {
+                ForEach(1...12, id: \.self) { m in
+                    Text(months.indices.contains(m - 1) ? months[m - 1] : "\(m)").tag(m)
+                }
+            }
+            .pickerStyle(.menu)
+            Stepper("Day: \(yearlyDay)", value: $yearlyDay, in: 1...31)
+        }
+    }
+
     private func currentSchedule() -> Schedule {
         switch scheduleKind {
         case .daily: return .daily
         case .weekdays: return .weekdays(selectedWeekdays.isEmpty ? [2, 3, 4, 5, 6] : selectedWeekdays)
         case .timesPerWeek: return .timesPerWeek(timesPerWeek)
+        case .monthly: return .monthly(selectedDaysOfMonth.isEmpty ? [1] : selectedDaysOfMonth)
+        case .yearly: return .yearly(month: yearlyMonth, day: yearlyDay)
+        case .everyNDays: return .everyNDays(max(2, intervalDays))
         }
     }
 
