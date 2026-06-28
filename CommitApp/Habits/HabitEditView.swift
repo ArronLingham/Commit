@@ -69,6 +69,7 @@ struct HabitEditView: View {
                     }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(habit == nil ? "New Habit" : "Edit Habit")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -82,7 +83,7 @@ struct HabitEditView: View {
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .frame(minWidth: 360, minHeight: 420)
+            .frame(minWidth: 440, minHeight: 560)
         }
     }
 

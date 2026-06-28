@@ -12,6 +12,8 @@ public struct ContributionGraphView: View {
     /// When true, the month label for the current calendar month is omitted (used by the
     /// year view, whose trailing/leading partial month would otherwise crowd the edge).
     public var excludeCurrentMonthLabel: Bool
+    /// Optional hover callback: the day under the pointer, or nil when the pointer leaves.
+    public var onHoverDay: ((DayContribution?) -> Void)?
 
     public init(
         days: [DayContribution],
@@ -19,7 +21,8 @@ public struct ContributionGraphView: View {
         spacing: CGFloat = 3,
         accent: Color = Theme.defaultAccent,
         showMonthLabels: Bool = true,
-        excludeCurrentMonthLabel: Bool = false
+        excludeCurrentMonthLabel: Bool = false,
+        onHoverDay: ((DayContribution?) -> Void)? = nil
     ) {
         self.days = days
         self.cellSize = cellSize
@@ -27,6 +30,7 @@ public struct ContributionGraphView: View {
         self.accent = accent
         self.showMonthLabels = showMonthLabels
         self.excludeCurrentMonthLabel = excludeCurrentMonthLabel
+        self.onHoverDay = onHoverDay
     }
 
     /// Days grouped into week columns (each column is 7 days, top = first weekday).
@@ -57,8 +61,10 @@ public struct ContributionGraphView: View {
                             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                                 .fill(color(for: day))
                                 .frame(width: cellSize, height: cellSize)
+                                .contentShape(Rectangle())
                                 .accessibilityLabel(Text(accessibilityLabel(for: day)))
                                 .help(day.summary)
+                                .onHover { onHoverDay?($0 ? day : nil) }
                         }
                     }
                 }

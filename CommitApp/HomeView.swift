@@ -20,6 +20,7 @@ struct HomeView: View {
     @State private var span: Span = .month
     @State private var newHabitName = ""
     @State private var editing: Habit?
+    @State private var hoveredDay: DayContribution?
 
     /// Width of the centred content column; also drives the year graph's fit-to-width sizing.
     private let contentWidth: CGFloat = 660
@@ -73,6 +74,11 @@ struct HomeView: View {
         VStack(spacing: 12) {
             graph
             ContributionLegend(accent: accent)
+            // Updates as you hover a cell (also shown as a native tooltip via .help).
+            Text(hoveredDay?.summary ?? " ")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(height: 14)
         }
         .frame(maxWidth: .infinity)
     }
@@ -102,7 +108,12 @@ struct HomeView: View {
                               ? Theme.cellColor(level: day.level, accent: accent)
                               : Theme.emptyCell.opacity(0.25))
                         .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
                         .help(day.summary)
+                        .onHover { hovering in
+                            if hovering { hoveredDay = day }
+                            else if hoveredDay == day { hoveredDay = nil }
+                        }
                 }
             }
         }
@@ -147,7 +158,13 @@ struct HomeView: View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(day.isInRange ? Theme.cellColor(level: day.level, accent: accent) : Color.clear)
             .frame(width: size, height: size)
+            .contentShape(Rectangle())
             .help(day.isInRange ? day.summary : "")
+            .onHover { hovering in
+                guard day.isInRange else { return }
+                if hovering { hoveredDay = day }
+                else if hoveredDay == day { hoveredDay = nil }
+            }
     }
 
     /// Year: the full ~52-week graph sized to fit the content width — no horizontal scroll.
@@ -161,7 +178,8 @@ struct HomeView: View {
             cellSize: cell,
             spacing: spacing,
             accent: accent,
-            showMonthLabels: true
+            showMonthLabels: true,
+            onHoverDay: { hoveredDay = $0 }
         )
         .frame(maxWidth: .infinity, alignment: .center)
     }
