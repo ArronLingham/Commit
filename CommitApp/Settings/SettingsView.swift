@@ -29,7 +29,6 @@ struct SettingsView: View {
                         .onTapGesture {
                             accentHex = hex
                             Theme.setAccent(hex: hex)
-                            HabitActions.reloadWidgets()
                         }
                 }
             }

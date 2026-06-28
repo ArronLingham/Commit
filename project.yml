@@ -6,8 +6,9 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 
-# Local-only macOS app (free Apple ID friendly): no Firebase / no external services.
-# Cross-device sync was removed; the app is a single-device local SwiftData app.
+# Local-only macOS app (free Apple ID friendly): no Firebase / no external services, and
+# no widget — App Groups (which a widget needs to read the app's store) require a
+# provisioning profile that a free account can't provide. Menu bar + app window only.
 
 settings:
   base:
@@ -22,7 +23,6 @@ settings:
 targets:
   # ---------------------------------------------------------------------------
   # Shared framework: models, scheduling, persistence, theme, graph view.
-  # Linked by both the app and the widget so there is one source of truth.
   # ---------------------------------------------------------------------------
   CommitCore:
     type: framework
@@ -47,45 +47,22 @@ targets:
     dependencies:
       - target: CommitCore
         embed: true
-      - target: CommitWidget
-        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit
         PRODUCT_NAME: Commit
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: CommitApp/Commit-macOS.entitlements
-        # macOS: automatic signing with a free Personal Team. Required because the App
-        # Groups entitlement (for widget data sharing) needs a provisioning profile, which
-        # ad-hoc "Sign to Run Locally" can't provide. Set DEVELOPMENT_TEAM in the base
-        # settings (or pick the team in Xcode → Signing & Capabilities) so this resolves.
+        # macOS: ad-hoc "Sign to Run Locally" so the app runs on this Mac with a free
+        # Apple ID — no team, no provisioning profile, no contact with Apple.
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+        "CODE_SIGN_STYLE[sdk=macosx*]": Manual
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": ""
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_CFBundleDisplayName: Commit
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_LSUIElement: NO
-        ENABLE_HARDENED_RUNTIME: YES
-
-  # ---------------------------------------------------------------------------
-  # WidgetKit extension — contribution graph + interactive "today" widget.
-  # ---------------------------------------------------------------------------
-  CommitWidget:
-    type: app-extension
-    supportedDestinations: [macOS]
-    sources:
-      - CommitWidget
-    dependencies:
-      - target: CommitCore
-        embed: false
-        link: true
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.widget
-        GENERATE_INFOPLIST_FILE: NO
-        INFOPLIST_FILE: CommitWidget/Info.plist
-        CODE_SIGN_ENTITLEMENTS: CommitWidget/CommitWidget-macOS.entitlements
-        # macOS: automatic signing with the Personal Team (matches the app target).
-        INFOPLIST_KEY_CFBundleDisplayName: Commit
         ENABLE_HARDENED_RUNTIME: YES
 
   # ---------------------------------------------------------------------------
@@ -108,7 +85,6 @@ schemes:
     build:
       targets:
         Commit: all
-        CommitWidget: all
     run:
       config: Debug
     test:

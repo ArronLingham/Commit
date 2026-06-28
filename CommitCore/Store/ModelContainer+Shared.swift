@@ -51,9 +51,6 @@ public enum SharedModelContainer {
         return try! ModelContainer(for: schema, configurations: [fallback])
     }
 
-    /// Shared container for the app and AppIntents (CloudKit when entitled).
+    /// Shared container for the app, menu bar, and AppIntents.
     public static let shared: ModelContainer = make(cloudKit: true)
-
-    /// Read-side container for the widget process (no CloudKit initialisation).
-    public static let widget: ModelContainer = make(cloudKit: false)
 }

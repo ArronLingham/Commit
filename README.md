@@ -7,8 +7,6 @@ external services, runs on a free Apple ID.
 - **Contribution graph** — your habits rendered as a "commit graph": each day's
   colour intensity is how many habits you completed that day, over the month or year.
 - **Menu bar** — check habits off from the macOS menu bar without opening the app.
-- **Widget** — the contribution graph plus an interactive widget to toggle today's
-  habits (see the note on widgets + free Apple IDs below).
 - **Flexible schedules** — daily, specific weekdays, or "X times per week".
 
 ## Project layout
@@ -17,13 +15,12 @@ external services, runs on a free Apple ID.
 CommitCore/      Shared framework: SwiftData models, scheduling, persistence,
                  theme, contribution-graph view, toggle AppIntent.
 CommitApp/       macOS app: Today, Progress, Habits, Settings, menu bar.
-CommitWidget/    WidgetKit extension: contribution graph + interactive today widget.
 CommitCoreTests/ Pure-logic unit tests (scheduling, intensity mapping).
 project.yml      XcodeGen project definition — the source of truth for the Xcode project.
 ```
 
 The SwiftData `@Model` types, scheduling logic, and the contribution-graph view live in
-**CommitCore** so the app and the widget share one implementation.
+**CommitCore**.
 
 ## Building (on a Mac with Xcode)
 
@@ -49,37 +46,29 @@ may ask you to confirm — right-click the app → **Open**.
 You can also copy the built `Commit.app` into `/Applications` and use it daily; unlike iOS,
 a locally-signed **macOS** app does **not** expire after 7 days.
 
-### Widgets on a free Apple ID
-
-The app and the widget share data through an **App Group** container
-(`group.com.arronlingham.commit`, see the `.entitlements` files and
-`SharedModelContainer`). The macOS entitlements request that App Group. Whether macOS
-honours it under a free / ad-hoc signature isn't guaranteed:
-
-- **If it works**, the desktop / Notification-Center widget shows your real habits.
-- **If macOS refuses it**, the widget falls back to an empty store — but the **menu bar**
-  (which runs in the app's own process and needs no App Group) still gives you the
-  always-visible glance.
-
-(On iOS, App Groups are strictly paid-only, which is one reason this app targets macOS.)
-
 ## Running & testing
 
 - Run **My Mac**. The app window has Today / Progress / Habits / Settings; a checkmark
-  icon appears in the **menu bar** — toggle habits there and the graph/widget update.
+  icon appears in the **menu bar** — toggle habits there and the graph updates.
 - Add habits with different schedules, toggle them on **Today**, and watch the
   contribution graph fill in.
 - **Tests:** `⌘U` runs `CommitCoreTests` (scheduling, intensity mapping).
 
-## Upgrading later (paid Apple Developer Program)
+## Scope & possible upgrades
 
-With a paid membership you could re-enable native **iCloud → CloudKit** sync and reliable
-**App Groups** for on-device widgets / iOS, and reintroduce an iOS target. The data layer
-(`SharedModelContainer`) is already structured around an App Group container to make that
-straightforward.
+This is intentionally a **single-device, local-only macOS app** so it runs free on a
+personal Apple ID. Two features need the **paid Apple Developer Program** and were left out:
+
+- **Widgets** — a WidgetKit widget needs an **App Group** to read the app's store, and App
+  Groups require a provisioning profile a free account can't provide. The **menu bar**
+  covers the same always-visible glance for free.
+- **Cross-device sync / iOS** — would use iCloud (CloudKit) or a backend; also gated by the
+  paid program for App Groups / device provisioning.
+
+The data layer (`SharedModelContainer`) is still structured around an App Group container,
+so re-enabling widgets / iCloud after upgrading is straightforward.
 
 ## Status
 
-Local-only macOS app: contribution graph, menu bar, widget (best-effort on free accounts),
-flexible schedules. See `project.yml` for targets and `CommitCore/` for the shared model
-and logic.
+Local-only macOS app: contribution graph, menu bar, flexible schedules. See `project.yml`
+for targets and `CommitCore/` for the shared model and logic.

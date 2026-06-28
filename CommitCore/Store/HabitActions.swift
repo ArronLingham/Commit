@@ -1,10 +1,8 @@
 import Foundation
 import SwiftData
-import WidgetKit
 
-/// Shared mutations used by the app, the menu bar, the interactive widget, and Shortcuts —
-/// so every path mutates the same way: stamp `updatedAt`, use tombstones for deletes, and
-/// refresh widgets.
+/// Shared mutations used by the app, the menu bar, and Shortcuts — so every path mutates
+/// the same way: stamp `updatedAt` and use tombstones (`isDeleted`) for deletes.
 ///
 /// Marked `@MainActor` because every caller (UI, AppIntents) runs on the main actor and
 /// these touch the main `ModelContext`.
@@ -12,8 +10,8 @@ import WidgetKit
 public enum HabitActions {
 
     /// Toggle whether `habit` is completed on `date` (defaults to today).
-    /// Un-checking sets a tombstone (isDeleted) rather than hard-deleting, so the widget
-    /// and contribution graph stay consistent.
+    /// Un-checking sets a tombstone (isDeleted) rather than hard-deleting, so the
+    /// contribution graph stays consistent.
     /// - Returns: `true` if the habit is now completed, `false` if it was un-completed.
     @discardableResult
     public static func toggleCompletion(
@@ -38,7 +36,6 @@ public enum HabitActions {
         }
 
         try? context.save()
-        reloadWidgets()
         return nowCompleted
     }
 
@@ -62,7 +59,6 @@ public enum HabitActions {
         )
         context.insert(habit)
         try? context.save()
-        reloadWidgets()
         return habit
     }
 
@@ -70,7 +66,6 @@ public enum HabitActions {
     public static func saveEdits(to habit: Habit, in context: ModelContext) {
         habit.updatedAt = Date()
         try? context.save()
-        reloadWidgets()
     }
 
     /// Set/clear the archived flag.
@@ -78,11 +73,10 @@ public enum HabitActions {
         habit.isArchived = archived
         habit.updatedAt = Date()
         try? context.save()
-        reloadWidgets()
     }
 
     /// Soft-delete (tombstone) a habit and its completions so they disappear from the
-    /// app, menu bar, and widget consistently.
+    /// app and menu bar consistently.
     public static func softDelete(_ habit: Habit, in context: ModelContext) {
         habit.isDeleted = true
         habit.updatedAt = Date()
@@ -91,10 +85,5 @@ public enum HabitActions {
             completion.updatedAt = Date()
         }
         try? context.save()
-        reloadWidgets()
-    }
-
-    public static func reloadWidgets() {
-        WidgetCenter.shared.reloadAllTimelines()
     }
 }
