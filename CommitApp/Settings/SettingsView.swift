@@ -7,13 +7,50 @@ struct SettingsView: View {
     private var accentHex = Theme.defaultAccentHex
     private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
 
+    @AppStorage(ReminderScheduler.enabledKey, store: CommitConstants.sharedDefaults)
+    private var reminderEnabled = false
+    @State private var reminderTime = Date()
+
     var body: some View {
         Form {
             accentSection
+            reminderSection
             aboutSection
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
+        .onAppear {
+            reminderTime = Calendar.current.date(
+                bySettingHour: ReminderScheduler.hour,
+                minute: ReminderScheduler.minute,
+                second: 0,
+                of: Date()
+            ) ?? Date()
+        }
+    }
+
+    // MARK: Reminder
+
+    private var reminderSection: some View {
+        Section {
+            Toggle("Daily reminder", isOn: $reminderEnabled)
+                .onChange(of: reminderEnabled) { _, _ in
+                    ReminderScheduler.refresh()
+                }
+            if reminderEnabled {
+                DatePicker("Time", selection: $reminderTime, displayedComponents: .hourAndMinute)
+                    .onChange(of: reminderTime) { _, newValue in
+                        let comps = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                        ReminderScheduler.hour = comps.hour ?? 22
+                        ReminderScheduler.minute = comps.minute ?? 0
+                        ReminderScheduler.refresh()
+                    }
+            }
+        } header: {
+            Text("Reminder")
+        } footer: {
+            Text("A daily notification nudging you to check off your habits.")
+        }
     }
 
     // MARK: Accent

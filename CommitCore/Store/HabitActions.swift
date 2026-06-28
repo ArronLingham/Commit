@@ -9,9 +9,9 @@ import SwiftData
 @MainActor
 public enum HabitActions {
 
-    /// Toggle whether `habit` is completed on `date` (defaults to today).
-    /// Un-checking sets a tombstone (isDeleted) rather than hard-deleting, so the
-    /// contribution graph stays consistent.
+    /// Toggle whether `habit` is completed on `date` (defaults to today). Checking inserts a
+    /// completion; un-checking **deletes** it so SwiftData refreshes the views — flipping a
+    /// flag left the `completions` relationship unchanged, so the UI never updated.
     /// - Returns: `true` if the habit is now completed, `false` if it was un-completed.
     @discardableResult
     public static func toggleCompletion(
@@ -26,12 +26,17 @@ public enum HabitActions {
         if let existing = (habit.completions ?? []).first(where: {
             calendar.isDate($0.day, inSameDayAs: day)
         }) {
-            existing.isDeleted.toggle()
-            existing.updatedAt = Date()
-            nowCompleted = !existing.isDeleted
+            if existing.isDeleted {
+                // Legacy tombstone → re-complete it.
+                existing.isDeleted = false
+                existing.updatedAt = Date()
+                nowCompleted = true
+            } else {
+                context.delete(existing)
+                nowCompleted = false
+            }
         } else {
-            let completion = HabitCompletion(day: day, habit: habit)
-            context.insert(completion)
+            context.insert(HabitCompletion(day: day, habit: habit))
             nowCompleted = true
         }
 

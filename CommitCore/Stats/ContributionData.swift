@@ -44,15 +44,26 @@ public struct DayContribution: Identifiable, Sendable, Hashable {
     public let level: Int
     /// Whether the day falls inside the requested range (vs. week-alignment padding).
     public let isInRange: Bool
+    /// Number of active habits scheduled on this day (the "out of" denominator for tooltips).
+    public let scheduled: Int
 
-    public init(date: Date, count: Int, level: Int, isInRange: Bool) {
+    public init(date: Date, count: Int, level: Int, isInRange: Bool, scheduled: Int = 0) {
         self.date = date
         self.count = count
         self.level = level
         self.isInRange = isInRange
+        self.scheduled = scheduled
     }
 
     public var id: Date { date }
+
+    /// Human-readable summary for hover tooltips, e.g. "Jun 3, 2026 — 2 of 3 completed".
+    public var summary: String {
+        let dateText = date.formatted(date: .abbreviated, time: .omitted)
+        return scheduled > 0
+            ? "\(dateText) — \(count) of \(scheduled) completed"
+            : "\(dateText) — \(count) completed"
+    }
 }
 
 /// A computed grid of contributions, aligned to whole weeks for rendering.
@@ -141,12 +152,14 @@ public func makeContributions(
     while cursor <= gridEnd {
         let count = counts[cursor] ?? 0
         let inRange = cursor >= rangeStart && cursor <= rangeEnd
+        let scheduled = active.filter { $0.schedule.isScheduled(on: cursor, calendar: calendar) }.count
         days.append(
             DayContribution(
                 date: cursor,
                 count: count,
                 level: ContributionLevel.level(count: count, max: denom),
-                isInRange: inRange
+                isInRange: inRange,
+                scheduled: scheduled
             )
         )
         cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? gridEnd.addingTimeInterval(86_400)

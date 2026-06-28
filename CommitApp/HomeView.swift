@@ -102,6 +102,7 @@ struct HomeView: View {
                               ? Theme.cellColor(level: day.level, accent: accent)
                               : Theme.emptyCell.opacity(0.25))
                         .frame(width: 36, height: 36)
+                        .help(day.summary)
                 }
             }
         }
@@ -146,6 +147,7 @@ struct HomeView: View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(day.isInRange ? Theme.cellColor(level: day.level, accent: accent) : Color.clear)
             .frame(width: size, height: size)
+            .help(day.isInRange ? day.summary : "")
     }
 
     /// Year: the full ~52-week graph sized to fit the content width — no horizontal scroll.
@@ -182,9 +184,10 @@ struct HomeView: View {
             } else {
                 ForEach(todaysHabits) { habit in
                     HabitRow(habit: habit, accent: accent) {
-                        withAnimation(.snappy) {
-                            _ = HabitActions.toggleCompletion(for: habit, in: context)
+                        let nowDone = withAnimation(.snappy) {
+                            HabitActions.toggleCompletion(for: habit, in: context)
                         }
+                        if nowDone { SoundEffects.playCheck() }
                     }
                     .contextMenu {
                         Button("Edit…") { editing = habit }

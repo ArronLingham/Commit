@@ -6,6 +6,11 @@ import CommitCore
 struct CommitApp: App {
     private let container = SharedModelContainer.shared
 
+    init() {
+        // Re-arm the daily reminder for returning users (no-op / no prompt if disabled).
+        ReminderScheduler.refresh()
+    }
+
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView()

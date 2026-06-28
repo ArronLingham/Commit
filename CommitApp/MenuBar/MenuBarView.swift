@@ -56,7 +56,9 @@ struct MenuBarView: View {
                 VStack(spacing: 6) {
                     ForEach(todaysHabits) { habit in
                         MenuBarHabitRow(habit: habit, accent: accent) {
-                            _ = HabitActions.toggleCompletion(for: habit, in: context)
+                            if HabitActions.toggleCompletion(for: habit, in: context) {
+                                SoundEffects.playCheck()
+                            }
                         }
                     }
                 }

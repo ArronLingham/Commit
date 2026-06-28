@@ -58,6 +58,7 @@ public struct ContributionGraphView: View {
                                 .fill(color(for: day))
                                 .frame(width: cellSize, height: cellSize)
                                 .accessibilityLabel(Text(accessibilityLabel(for: day)))
+                                .help(day.summary)
                         }
                     }
                 }
