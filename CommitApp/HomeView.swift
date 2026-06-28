@@ -17,10 +17,17 @@ struct HomeView: View {
         case week = "Week", month = "Month", year = "Year"
         var id: String { rawValue }
     }
+    enum Scope: String, CaseIterable, Identifiable {
+        case today = "Today", all = "All"
+        var id: String { rawValue }
+    }
     @State private var span: Span = .month
+    @State private var scope: Scope = .today
     @State private var newHabitName = ""
     @State private var editing: Habit?
     @State private var hoveredDay: DayContribution?
+    @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
+    private var otherHabitsStyle: OtherHabitsStyle = .upcoming
 
     /// Width of the centred content column; also drives the year graph's fit-to-width sizing.
     private let contentWidth: CGFloat = 660
@@ -28,6 +35,11 @@ struct HomeView: View {
 
     private var todaysHabits: [Habit] {
         habits.filter { $0.schedule.isScheduled(on: Date()) }
+    }
+
+    private var upcomingHabits: [Habit] {
+        habits.filter { !$0.schedule.isScheduled(on: Date()) }
+            .sorted { ($0.schedule.nextDate() ?? .distantFuture) < ($1.schedule.nextDate() ?? .distantFuture) }
     }
 
     private var contributions: Contributions {
@@ -46,8 +58,7 @@ struct HomeView: View {
                 VStack(spacing: 24) {
                     graphSection
                     Divider()
-                    todaySection
-                    quickAdd
+                    habitsArea
                 }
                 .padding(horizontalPadding)
                 .frame(maxWidth: contentWidth)
@@ -184,38 +195,137 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    // MARK: Today
+    // MARK: Habits
 
+    /// Today's habits plus, depending on the user's Settings choice, the habits that aren't
+    /// due today (an Upcoming section, a Today/All toggle, or a collapsible list).
     @ViewBuilder
-    private var todaySection: some View {
+    private var habitsArea: some View {
+        switch otherHabitsStyle {
+        case .upcoming:
+            todaySectionView
+            if !upcomingHabits.isEmpty { upcomingSection }
+            quickAdd
+        case .toggle:
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Scope", selection: $scope) {
+                    ForEach(Scope.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                if scope == .today { todayRows } else { allHabitsRows }
+            }
+            quickAdd
+        case .collapsible:
+            todaySectionView
+            if !upcomingHabits.isEmpty {
+                DisclosureGroup("Other habits (\(upcomingHabits.count))") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(upcomingHabits) { infoRow($0) }
+                    }
+                }
+            }
+            quickAdd
+        }
+    }
+
+    private var todaySectionView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Today")
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            todayRows
+        }
+    }
 
-            if todaysHabits.isEmpty {
-                ContentUnavailableView(
-                    "Nothing scheduled",
-                    systemImage: "leaf",
-                    description: Text("Add a habit below to start your streak.")
-                )
-            } else {
-                ForEach(todaysHabits) { habit in
-                    HabitRow(habit: habit, accent: accent) {
-                        let nowDone = withAnimation(.snappy) {
-                            HabitActions.toggleCompletion(for: habit, in: context)
-                        }
-                        if nowDone { SoundEffects.playCheck() }
-                    }
-                    .contextMenu {
-                        Button("Edit…") { editing = habit }
-                        Button("Delete", role: .destructive) {
-                            HabitActions.softDelete(habit, in: context)
-                        }
-                    }
+    @ViewBuilder
+    private var todayRows: some View {
+        if todaysHabits.isEmpty {
+            ContentUnavailableView(
+                "Nothing scheduled",
+                systemImage: "leaf",
+                description: Text("Add a habit below to start your streak.")
+            )
+        } else {
+            ForEach(todaysHabits) { habit in checkableRow(habit) }
+        }
+    }
+
+    @ViewBuilder
+    private var allHabitsRows: some View {
+        if habits.isEmpty {
+            ContentUnavailableView(
+                "No habits yet",
+                systemImage: "leaf",
+                description: Text("Add a habit below to get started.")
+            )
+        } else {
+            ForEach(habits) { habit in
+                if habit.schedule.isScheduled(on: Date()) {
+                    checkableRow(habit)
+                } else {
+                    infoRow(habit)
                 }
             }
         }
+    }
+
+    private var upcomingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Upcoming")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ForEach(upcomingHabits) { infoRow($0) }
+        }
+    }
+
+    /// A checkable habit row (today's habits) with an edit/delete context menu.
+    private func checkableRow(_ habit: Habit) -> some View {
+        HabitRow(habit: habit, accent: accent) {
+            let nowDone = withAnimation(.snappy) {
+                HabitActions.toggleCompletion(for: habit, in: context)
+            }
+            if nowDone { SoundEffects.playCheck() }
+        }
+        .contextMenu { editDeleteMenu(habit) }
+    }
+
+    /// A non-checkable row for habits not due today: shows the next occurrence; edit/delete via menu.
+    private func infoRow(_ habit: Habit) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: habit.iconName)
+                .font(.title3)
+                .foregroundStyle(Color(hex: habit.colorHex) ?? accent)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(habit.name.isEmpty ? "Untitled" : habit.name)
+                    .foregroundStyle(.primary)
+                Text(nextText(habit))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .contextMenu { editDeleteMenu(habit) }
+    }
+
+    @ViewBuilder
+    private func editDeleteMenu(_ habit: Habit) -> some View {
+        Button("Edit…") { editing = habit }
+        Button("Delete", role: .destructive) {
+            HabitActions.softDelete(habit, in: context)
+        }
+    }
+
+    /// "Next: Sunday · Jun 29" — the habit's next scheduled day, weekday + date.
+    private func nextText(_ habit: Habit) -> String {
+        guard let date = habit.schedule.nextDate() else {
+            return habit.schedule.shortDescription()
+        }
+        let weekday = date.formatted(.dateTime.weekday(.wide))
+        let day = date.formatted(.dateTime.month(.abbreviated).day())
+        return "Next: \(weekday) · \(day)"
     }
 
     // MARK: Quick add

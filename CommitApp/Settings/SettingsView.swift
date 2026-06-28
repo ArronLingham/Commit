@@ -11,10 +11,14 @@ struct SettingsView: View {
     private var reminderEnabled = false
     @State private var reminderTime = Date()
 
+    @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
+    private var otherHabitsStyle: OtherHabitsStyle = .upcoming
+
     var body: some View {
         Form {
             accentSection
             reminderSection
+            layoutSection
             aboutSection
         }
         .formStyle(.grouped)
@@ -50,6 +54,22 @@ struct SettingsView: View {
             Text("Reminder")
         } footer: {
             Text("A daily notification nudging you to check off your habits.")
+        }
+    }
+
+    // MARK: Layout
+
+    private var layoutSection: some View {
+        Section {
+            Picker("Other habits", selection: $otherHabitsStyle) {
+                ForEach(OtherHabitsStyle.allCases) { style in
+                    Text(style.label).tag(style)
+                }
+            }
+        } header: {
+            Text("Layout")
+        } footer: {
+            Text("How habits that aren't due today appear on the main page.")
         }
     }
 
