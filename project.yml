@@ -55,11 +55,10 @@ targets:
         PRODUCT_NAME: Commit
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: CommitApp/Commit-macOS.entitlements
-        # macOS: ad-hoc "Sign to Run Locally" so the app runs on this Mac with a free
-        # Apple ID — no team, no provisioning profile, no contact with Apple.
-        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
-        "CODE_SIGN_STYLE[sdk=macosx*]": Manual
-        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": ""
+        # macOS: automatic signing with a free Personal Team. Required because the App
+        # Groups entitlement (for widget data sharing) needs a provisioning profile, which
+        # ad-hoc "Sign to Run Locally" can't provide. Set DEVELOPMENT_TEAM in the base
+        # settings (or pick the team in Xcode → Signing & Capabilities) so this resolves.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_CFBundleDisplayName: Commit
@@ -85,10 +84,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CommitWidget/Info.plist
         CODE_SIGN_ENTITLEMENTS: CommitWidget/CommitWidget-macOS.entitlements
-        # macOS: ad-hoc "Sign to Run Locally" (matches the app target — free-account friendly).
-        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
-        "CODE_SIGN_STYLE[sdk=macosx*]": Manual
-        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": ""
+        # macOS: automatic signing with the Personal Team (matches the app target).
         INFOPLIST_KEY_CFBundleDisplayName: Commit
         ENABLE_HARDENED_RUNTIME: YES
 
