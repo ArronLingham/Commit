@@ -34,7 +34,7 @@ struct HomeView: View {
         switch span {
         case .week: range = .week(Date())
         case .month: range = .month(Date())
-        case .year: range = .year(Date())
+        case .year: range = .calendarYear(Date())
         }
         return makeContributions(habits: habits, range: range)
     }
@@ -159,8 +159,7 @@ struct HomeView: View {
             cellSize: cell,
             spacing: spacing,
             accent: accent,
-            showMonthLabels: true,
-            excludeCurrentMonthLabel: true
+            showMonthLabels: true
         )
         .frame(maxWidth: .infinity, alignment: .center)
     }
@@ -184,7 +183,7 @@ struct HomeView: View {
                 ForEach(todaysHabits) { habit in
                     HabitRow(habit: habit, accent: accent) {
                         withAnimation(.snappy) {
-                            HabitActions.complete(habit, in: context)
+                            _ = HabitActions.toggleCompletion(for: habit, in: context)
                         }
                     }
                     .contextMenu {
@@ -228,18 +227,18 @@ struct HomeView: View {
     }
 }
 
-/// A single habit row with an inline complete toggle. Tapping **completes** the habit;
-/// completions can't be undone here (`HabitActions.complete` is idempotent).
+/// A single habit row with an inline toggle: tapping checks the habit off for today, and
+/// tapping it again un-checks it.
 struct HabitRow: View {
     let habit: Habit
     let accent: Color
-    let complete: () -> Void
+    let toggle: () -> Void
 
     private var habitColor: Color { Color(hex: habit.colorHex) ?? accent }
     private var done: Bool { habit.isCompleted(on: Date()) }
 
     var body: some View {
-        Button(action: complete) {
+        Button(action: toggle) {
             HStack(spacing: 12) {
                 Image(systemName: habit.iconName)
                     .font(.title3)

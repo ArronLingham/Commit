@@ -39,21 +39,6 @@ public enum HabitActions {
         return nowCompleted
     }
 
-    /// Mark `habit` complete on `date` (default today). **Idempotent** — it never
-    /// un-completes, so a tap can't accidentally remove a completion.
-    public static func complete(_ habit: Habit, on date: Date = Date(), in context: ModelContext) {
-        let calendar = Calendar.current
-        let day = calendar.startOfDay(for: date)
-        if let existing = (habit.completions ?? []).first(where: { calendar.isDate($0.day, inSameDayAs: day) }) {
-            guard existing.isDeleted else { return }   // already completed → no-op
-            existing.isDeleted = false
-            existing.updatedAt = Date()
-        } else {
-            context.insert(HabitCompletion(day: day, habit: habit))
-        }
-        try? context.save()
-    }
-
     /// Insert a new habit at the end of the current ordering.
     @discardableResult
     public static func addHabit(

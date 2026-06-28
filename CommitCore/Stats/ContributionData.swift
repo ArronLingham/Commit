@@ -73,6 +73,8 @@ public enum ContributionGraphRange: Sendable {
     case month(Date)
     /// The trailing ~52 weeks ending on the given date.
     case year(Date)
+    /// The full calendar year (Jan 1 – Dec 31) containing the given date.
+    case calendarYear(Date)
     /// The trailing `n` weeks ending today.
     case trailingWeeks(Int)
     /// The calendar week containing the given date.
@@ -89,6 +91,12 @@ public enum ContributionGraphRange: Sendable {
         case .year(let date):
             let end = calendar.startOfDay(for: date)
             let start = calendar.date(byAdding: .day, value: -363, to: end) ?? end
+            return (start, end)
+        case .calendarYear(let date):
+            let year = calendar.component(.year, from: date)
+            let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1))
+                ?? calendar.startOfDay(for: date)
+            let end = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) ?? start
             return (start, end)
         case .trailingWeeks(let n):
             let end = calendar.startOfDay(for: reference)
