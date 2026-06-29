@@ -1,0 +1,93 @@
+name: Commit
+options:
+  bundleIdPrefix: com.arronlingham
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+# Local-only macOS app (free Apple ID friendly): no Firebase / no external services, and
+# no widget — App Groups (which a widget needs to read the app's store) require a
+# provisioning profile that a free account can't provide. Menu bar + app window only.
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.10"
+    # Set your Apple Developer Team ID here (or in Xcode's Signing & Capabilities).
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  # ---------------------------------------------------------------------------
+  # Shared framework: models, scheduling, persistence, theme, graph view.
+  # ---------------------------------------------------------------------------
+  CommitCore:
+    type: framework
+    supportedDestinations: [macOS]
+    sources:
+      - CommitCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.core
+        DEFINES_MODULE: YES
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: NO
+
+  # ---------------------------------------------------------------------------
+  # Main app — SwiftUI, macOS only (local-only).
+  # ---------------------------------------------------------------------------
+  Commit:
+    type: application
+    supportedDestinations: [macOS]
+    sources:
+      - CommitApp
+    dependencies:
+      - target: CommitCore
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit
+        PRODUCT_NAME: Commit
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: CommitApp/Commit-macOS.entitlements
+        # macOS: ad-hoc "Sign to Run Locally" so the app runs on this Mac with a free
+        # Apple ID — no team, no provisioning profile, no contact with Apple.
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+        "CODE_SIGN_STYLE[sdk=macosx*]": Manual
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_CFBundleDisplayName: Commit
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_LSUIElement: NO
+        ENABLE_HARDENED_RUNTIME: YES
+
+  # ---------------------------------------------------------------------------
+  # Pure-logic unit tests for scheduling + intensity mapping.
+  # ---------------------------------------------------------------------------
+  CommitCoreTests:
+    type: bundle.unit-test
+    supportedDestinations: [macOS]
+    sources:
+      - CommitCoreTests
+    dependencies:
+      - target: CommitCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit.coretests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Commit:
+    build:
+      targets:
+        Commit: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CommitCoreTests
