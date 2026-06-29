@@ -188,6 +188,16 @@ public extension Habit {
         return completedDaySet(calendar: calendar).filter { $0 >= weekStart && $0 <= weekEnd }.count
     }
 
+    /// Completions within the calendar month containing `date`.
+    func monthlyCompletionCount(asOf date: Date = Date(), calendar: Calendar = .current) -> Int {
+        let comps = calendar.dateComponents([.year, .month], from: date)
+        guard let monthStart = calendar.date(from: comps),
+              let range = calendar.range(of: .day, in: .month, for: monthStart),
+              let monthEnd = calendar.date(byAdding: .day, value: range.count - 1, to: monthStart)
+        else { return 0 }
+        return completedDaySet(calendar: calendar).filter { $0 >= monthStart && $0 <= monthEnd }.count
+    }
+
     /// Current streak.
     ///
     /// For daily / weekday habits this counts consecutive *scheduled* days completed,
@@ -214,6 +224,30 @@ public extension Habit {
                     break
                 }
                 weekStart = calendar.date(byAdding: .weekOfYear, value: -1, to: weekStart) ?? weekStart
+            }
+            return streak
+        }
+
+        if case .timesPerMonth(let target) = schedule {
+            var streak = 0
+            let currentMonthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: date))
+                ?? calendar.startOfDay(for: date)
+            var monthStart = currentMonthStart
+            var safety = 0
+            while safety < 240 {
+                safety += 1
+                guard let range = calendar.range(of: .day, in: .month, for: monthStart),
+                      let monthEnd = calendar.date(byAdding: .day, value: range.count - 1, to: monthStart)
+                else { break }
+                let count = completed.filter { $0 >= monthStart && $0 <= monthEnd }.count
+                if count >= target {
+                    streak += 1
+                } else if calendar.isDate(monthStart, equalTo: currentMonthStart, toGranularity: .month) {
+                    // Current month still in progress — don't count, don't break.
+                } else {
+                    break
+                }
+                monthStart = calendar.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
             }
             return streak
         }

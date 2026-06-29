@@ -409,6 +409,8 @@ struct HabitRow: View {
         if streak > 0 { parts.append("🔥 \(streak)") }
         if case .timesPerWeek(let target) = habit.schedule {
             parts.append("\(habit.weeklyCompletionCount())/\(target) this week")
+        } else if case .timesPerMonth(let target) = habit.schedule {
+            parts.append("\(habit.monthlyCompletionCount())/\(target) this month")
         } else {
             parts.append(habit.schedule.shortDescription())
         }

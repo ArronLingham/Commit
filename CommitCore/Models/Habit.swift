@@ -69,6 +69,10 @@ public final class Habit {
             self.scheduleRaw = ScheduleKind.timesPerWeek.rawValue
             self.weekdays = []
             self.targetPerWeek = max(1, n)
+        case .timesPerMonth(let n):
+            self.scheduleRaw = ScheduleKind.timesPerMonth.rawValue
+            self.weekdays = []
+            self.targetPerWeek = max(1, n)          // reused field: monthly target
         case .monthly(let days):
             self.scheduleRaw = ScheduleKind.monthly.rawValue
             self.weekdays = days.sorted()          // reused field: days of month
@@ -93,6 +97,7 @@ public extension Habit {
             case .daily: return .daily
             case .weekdays: return .weekdays(Set(weekdays))
             case .timesPerWeek: return .timesPerWeek(max(1, targetPerWeek))
+            case .timesPerMonth: return .timesPerMonth(max(1, targetPerWeek))
             case .monthly: return .monthly(Set(weekdays))
             case .yearly:
                 let month = weekdays.indices.contains(0) ? weekdays[0] : 1
@@ -110,6 +115,9 @@ public extension Habit {
                 weekdays = days.sorted()
             case .timesPerWeek(let n):
                 scheduleRaw = ScheduleKind.timesPerWeek.rawValue
+                targetPerWeek = max(1, n)
+            case .timesPerMonth(let n):
+                scheduleRaw = ScheduleKind.timesPerMonth.rawValue
                 targetPerWeek = max(1, n)
             case .monthly(let days):
                 scheduleRaw = ScheduleKind.monthly.rawValue

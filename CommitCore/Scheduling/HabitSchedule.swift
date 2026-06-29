@@ -5,6 +5,7 @@ public enum ScheduleKind: String, CaseIterable, Codable, Sendable {
     case daily
     case weekdays
     case timesPerWeek
+    case timesPerMonth
     case monthly
     case yearly
     case everyNDays
@@ -18,6 +19,8 @@ public enum Schedule: Equatable, Hashable, Sendable {
     case weekdays(Set<Int>)
     /// Any `n` days within a calendar week.
     case timesPerWeek(Int)
+    /// Any `n` days within a calendar month.
+    case timesPerMonth(Int)
     /// Specific days of the month, 1…31.
     case monthly(Set<Int>)
     /// A specific calendar date each year (month 1…12, day 1…31).
@@ -30,6 +33,7 @@ public enum Schedule: Equatable, Hashable, Sendable {
         case .daily: return .daily
         case .weekdays: return .weekdays
         case .timesPerWeek: return .timesPerWeek
+        case .timesPerMonth: return .timesPerMonth
         case .monthly: return .monthly
         case .yearly: return .yearly
         case .everyNDays: return .everyNDays
@@ -47,6 +51,8 @@ public enum Schedule: Equatable, Hashable, Sendable {
         case .weekdays(let days):
             return days.contains(calendar.component(.weekday, from: date))
         case .timesPerWeek:
+            return true
+        case .timesPerMonth:
             return true
         case .monthly(let days):
             return days.contains(calendar.component(.day, from: date))
@@ -79,6 +85,8 @@ public enum Schedule: Equatable, Hashable, Sendable {
             }.joined(separator: ", ")
         case .timesPerWeek(let n):
             return "\(n)× / week"
+        case .timesPerMonth(let n):
+            return "\(n)× / month"
         case .monthly(let days):
             if days.isEmpty { return "Monthly" }
             return "Monthly: " + days.sorted().map(String.init).joined(separator: ", ")

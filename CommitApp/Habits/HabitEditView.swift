@@ -16,6 +16,7 @@ struct HabitEditView: View {
     @State private var scheduleKind: ScheduleKind
     @State private var selectedWeekdays: Set<Int>
     @State private var timesPerWeek: Int
+    @State private var timesPerMonth: Int
     @State private var selectedDaysOfMonth: Set<Int>
     @State private var yearlyMonth: Int
     @State private var yearlyDay: Int
@@ -44,6 +45,11 @@ struct HabitEditView: View {
             _timesPerWeek = State(initialValue: n)
         } else {
             _timesPerWeek = State(initialValue: 3)
+        }
+        if case .timesPerMonth(let n) = schedule {
+            _timesPerMonth = State(initialValue: n)
+        } else {
+            _timesPerMonth = State(initialValue: 10)
         }
         if case .monthly(let days) = schedule {
             _selectedDaysOfMonth = State(initialValue: days)
@@ -81,6 +87,7 @@ struct HabitEditView: View {
                         Text("Daily").tag(ScheduleKind.daily)
                         Text("Specific days").tag(ScheduleKind.weekdays)
                         Text("Times per week").tag(ScheduleKind.timesPerWeek)
+                        Text("Times per month").tag(ScheduleKind.timesPerMonth)
                         Text("Monthly").tag(ScheduleKind.monthly)
                         Text("Yearly").tag(ScheduleKind.yearly)
                         Text("Every N days").tag(ScheduleKind.everyNDays)
@@ -91,6 +98,8 @@ struct HabitEditView: View {
                         weekdayPicker
                     } else if scheduleKind == .timesPerWeek {
                         Stepper("\(timesPerWeek)× per week", value: $timesPerWeek, in: 1...7)
+                    } else if scheduleKind == .timesPerMonth {
+                        Stepper("\(timesPerMonth)× per month", value: $timesPerMonth, in: 1...31)
                     } else if scheduleKind == .monthly {
                         dayOfMonthPicker
                     } else if scheduleKind == .yearly {
@@ -210,6 +219,7 @@ struct HabitEditView: View {
         case .daily: return .daily
         case .weekdays: return .weekdays(selectedWeekdays.isEmpty ? [2, 3, 4, 5, 6] : selectedWeekdays)
         case .timesPerWeek: return .timesPerWeek(timesPerWeek)
+        case .timesPerMonth: return .timesPerMonth(timesPerMonth)
         case .monthly: return .monthly(selectedDaysOfMonth.isEmpty ? [1] : selectedDaysOfMonth)
         case .yearly: return .yearly(month: yearlyMonth, day: yearlyDay)
         case .everyNDays: return .everyNDays(max(2, intervalDays))
