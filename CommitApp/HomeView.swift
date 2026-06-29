@@ -28,6 +28,8 @@ struct HomeView: View {
     @State private var hoveredDay: DayContribution?
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
+    @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
+    private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
 
     /// Width of the centred content column; also drives the year graph's fit-to-width sizing.
     private let contentWidth: CGFloat = 660
@@ -325,7 +327,11 @@ struct HomeView: View {
         }
         let weekday = date.formatted(.dateTime.weekday(.wide))
         let day = date.formatted(.dateTime.month(.abbreviated).day())
-        return "Next: \(weekday) · \(day)"
+        switch nextOccurrenceStyle {
+        case .weekday: return "Next: \(weekday)"
+        case .date: return "Next: \(day)"
+        case .weekdayAndDate: return "Next: \(weekday) · \(day)"
+        }
     }
 
     // MARK: Quick add

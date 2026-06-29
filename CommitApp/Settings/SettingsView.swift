@@ -13,6 +13,8 @@ struct SettingsView: View {
 
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
+    @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
+    private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
 
     var body: some View {
         Form {
@@ -66,10 +68,15 @@ struct SettingsView: View {
                     Text(style.label).tag(style)
                 }
             }
+            Picker("Next occurrence", selection: $nextOccurrenceStyle) {
+                ForEach(NextOccurrenceStyle.allCases) { style in
+                    Text(style.label).tag(style)
+                }
+            }
         } header: {
             Text("Layout")
         } footer: {
-            Text("How habits that aren't due today appear on the main page.")
+            Text("How habits that aren't due today appear on the main page, and how each one's next occurrence is written.")
         }
     }
 
