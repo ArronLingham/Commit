@@ -1,5 +1,8 @@
 import Foundation
 
+/// Storage key for the "show menu bar icon" preference (shared by the app and Settings).
+let showMenuBarIconKey = "showMenuBarIcon"
+
 /// How the home page presents habits that aren't due today. User-selectable in Settings.
 enum OtherHabitsStyle: String, CaseIterable, Identifiable {
     /// A second "Upcoming" section under Today.

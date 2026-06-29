@@ -5,6 +5,8 @@ import CommitCore
 @main
 struct CommitApp: App {
     private let container = SharedModelContainer.shared
+    @AppStorage(showMenuBarIconKey, store: CommitConstants.sharedDefaults)
+    private var showMenuBarIcon = true
 
     init() {
         // Re-arm the daily reminder for returning users (no-op / no prompt if disabled).
@@ -20,7 +22,7 @@ struct CommitApp: App {
 
         #if os(macOS)
         // Quick check-off from the menu bar.
-        MenuBarExtra("Commit", systemImage: "checkmark.seal") {
+        MenuBarExtra("Commit", systemImage: "checkmark.seal", isInserted: $showMenuBarIcon) {
             MenuBarView()
                 .modelContainer(container)
                 .frame(width: 320)

@@ -15,12 +15,15 @@ struct SettingsView: View {
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
+    @AppStorage(showMenuBarIconKey, store: CommitConstants.sharedDefaults)
+    private var showMenuBarIcon = true
 
     var body: some View {
         Form {
             accentSection
             reminderSection
             layoutSection
+            menuBarSection
             aboutSection
         }
         .formStyle(.grouped)
@@ -77,6 +80,18 @@ struct SettingsView: View {
             Text("Layout")
         } footer: {
             Text("How habits that aren't due today appear on the main page, and how each one's next occurrence is written.")
+        }
+    }
+
+    // MARK: Menu bar
+
+    private var menuBarSection: some View {
+        Section {
+            Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
+        } header: {
+            Text("Menu Bar")
+        } footer: {
+            Text("Hide the checkmark from the menu bar. You can still open Commit from the Dock or Applications.")
         }
     }
 
