@@ -246,10 +246,10 @@ struct HomeView: View {
             let isFuture = Calendar.current.startOfDay(for: day) > Calendar.current.startOfDay(for: Date())
             let dayHabits = habitsScheduled(on: day)
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
+                HStack(spacing: 16) {
                     Text(day.formatted(.dateTime.weekday(.wide).month(.wide).day().year()))
                         .font(.headline)
-                    Spacer()
+                    Spacer(minLength: 16)
                     Button {
                         withAnimation(.snappy) { selectedDay = nil }
                     } label: {
@@ -275,7 +275,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: true, vertical: false)   // hug content width
             .padding(14)
             .background(Color.secondary.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -307,16 +307,9 @@ struct HomeView: View {
                 .frame(width: 24)
             Text(habit.name.isEmpty ? "Untitled" : habit.name)
                 .foregroundStyle(.primary)
-            Spacer()
-            Button {
-                editing = habit
-            } label: {
-                Image(systemName: "pencil")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Edit habit")
         }
+        .contentShape(Rectangle())
+        .contextMenu { editDeleteMenu(habit) }
     }
 
     // MARK: Habits
