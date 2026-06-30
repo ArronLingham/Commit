@@ -36,10 +36,14 @@ struct MenuBarView: View {
             }
 
             let contributions = makeContributions(habits: habits, range: .trailingWeeks(14))
+            let cols = CGFloat(max(1, Int((Double(contributions.days.count) / 7).rounded(.up))))
+            let menuSpacing: CGFloat = 2
+            // Popover is fixed at 320pt wide; subtract the view's own padding on both sides.
+            let menuCell = max(7, ((320 - 14 * 2 - menuSpacing * (cols - 1)) / cols).rounded(.down))
             ContributionGraphView(
                 days: contributions.days,
-                cellSize: 9,
-                spacing: 2,
+                cellSize: menuCell,
+                spacing: menuSpacing,
                 accent: accent,
                 showMonthLabels: false
             )
