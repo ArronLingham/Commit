@@ -26,6 +26,7 @@ struct HomeView: View {
     @State private var newHabitName = ""
     @State private var editing: Habit?
     @State private var hoveredDay: DayContribution?
+    @State private var selectedDay: Date?
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
@@ -59,6 +60,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     graphSection
+                    if selectedDay != nil { dayDetail }
                     Divider()
                     habitsArea
                 }
@@ -121,12 +123,19 @@ struct HomeView: View {
                               ? Theme.cellColor(level: day.level, accent: accent)
                               : Theme.emptyCell.opacity(0.25))
                         .frame(width: 36, height: 36)
+                        .overlay {
+                            if isSelected(day) {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(Color.primary, lineWidth: 2.5)
+                            }
+                        }
                         .contentShape(Rectangle())
                         .help(day.summary)
                         .onHover { hovering in
                             if hovering { hoveredDay = day }
                             else if hoveredDay == day { hoveredDay = nil }
                         }
+                        .onTapGesture { if day.isInRange { selectDay(day.date) } }
                 }
             }
         }
@@ -171,6 +180,12 @@ struct HomeView: View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(day.isInRange ? Theme.cellColor(level: day.level, accent: accent) : Color.clear)
             .frame(width: size, height: size)
+            .overlay {
+                if isSelected(day) {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.primary, lineWidth: 2.5)
+                }
+            }
             .contentShape(Rectangle())
             .help(day.isInRange ? day.summary : "")
             .onHover { hovering in
@@ -178,6 +193,7 @@ struct HomeView: View {
                 if hovering { hoveredDay = day }
                 else if hoveredDay == day { hoveredDay = nil }
             }
+            .onTapGesture { if day.isInRange { selectDay(day.date) } }
     }
 
     /// Year: the full ~52-week graph sized to fit the content width — no horizontal scroll.
@@ -192,9 +208,115 @@ struct HomeView: View {
             spacing: spacing,
             accent: accent,
             showMonthLabels: true,
-            onHoverDay: { hoveredDay = $0 }
+            onHoverDay: { hoveredDay = $0 },
+            selectedDate: selectedDay,
+            onSelectDay: { selectDay($0.date) }
         )
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func isSelected(_ day: DayContribution) -> Bool {
+        guard day.isInRange, let selected = selectedDay else { return false }
+        return Calendar.current.isDate(selected, inSameDayAs: day.date)
+    }
+
+    /// Toggle the selected day: clicking the same cell again closes the detail card.
+    private func selectDay(_ date: Date) {
+        withAnimation(.snappy) {
+            if let current = selectedDay, Calendar.current.isDate(current, inSameDayAs: date) {
+                selectedDay = nil
+            } else {
+                selectedDay = date
+            }
+        }
+    }
+
+    // MARK: Day detail
+
+    /// The habits scheduled on `date`, in the same order as the main list.
+    private func habitsScheduled(on date: Date) -> [Habit] {
+        habits.filter { $0.schedule.isScheduled(on: date) }
+    }
+
+    /// Inline card shown under the graph when a day is selected: that day's habits with a
+    /// per-day completion toggle (so you can backfill a missed day) and a per-habit edit button.
+    @ViewBuilder
+    private var dayDetail: some View {
+        if let day = selectedDay {
+            let isFuture = Calendar.current.startOfDay(for: day) > Calendar.current.startOfDay(for: Date())
+            let dayHabits = habitsScheduled(on: day)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(day.formatted(.dateTime.weekday(.wide).month(.wide).day().year()))
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        withAnimation(.snappy) { selectedDay = nil }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Close")
+                }
+
+                if dayHabits.isEmpty {
+                    Text("No habits scheduled this day.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(dayHabits) { habit in
+                        dayDetailRow(habit, on: day, locked: isFuture)
+                    }
+                    if isFuture {
+                        Text("Future day — check-offs are disabled.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color.secondary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
+    /// A row inside the day-detail card: completion toggle for the selected day + an Edit button.
+    private func dayDetailRow(_ habit: Habit, on day: Date, locked: Bool) -> some View {
+        let habitColor = Color(hex: habit.colorHex) ?? accent
+        let done = habit.isCompleted(on: day)
+        return HStack(spacing: 12) {
+            Button {
+                let nowDone = withAnimation(.snappy) {
+                    HabitActions.toggleCompletion(for: habit, on: day, in: context)
+                }
+                if nowDone { SoundEffects.playCheck() }
+            } label: {
+                Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(done ? habitColor : Color.secondary.opacity(0.6))
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.plain)
+            .disabled(locked)
+
+            Image(systemName: habit.iconName)
+                .foregroundStyle(habitColor)
+                .frame(width: 24)
+            Text(habit.name.isEmpty ? "Untitled" : habit.name)
+                .foregroundStyle(.primary)
+            Spacer()
+            Button {
+                editing = habit
+            } label: {
+                Image(systemName: "pencil")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Edit habit")
+        }
     }
 
     // MARK: Habits

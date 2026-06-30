@@ -14,6 +14,10 @@ public struct ContributionGraphView: View {
     public var excludeCurrentMonthLabel: Bool
     /// Optional hover callback: the day under the pointer, or nil when the pointer leaves.
     public var onHoverDay: ((DayContribution?) -> Void)?
+    /// The currently selected day — drawn with a highlight ring.
+    public var selectedDate: Date?
+    /// Optional tap callback: the day the user clicked.
+    public var onSelectDay: ((DayContribution) -> Void)?
 
     public init(
         days: [DayContribution],
@@ -22,7 +26,9 @@ public struct ContributionGraphView: View {
         accent: Color = Theme.defaultAccent,
         showMonthLabels: Bool = true,
         excludeCurrentMonthLabel: Bool = false,
-        onHoverDay: ((DayContribution?) -> Void)? = nil
+        onHoverDay: ((DayContribution?) -> Void)? = nil,
+        selectedDate: Date? = nil,
+        onSelectDay: ((DayContribution) -> Void)? = nil
     ) {
         self.days = days
         self.cellSize = cellSize
@@ -31,6 +37,8 @@ public struct ContributionGraphView: View {
         self.showMonthLabels = showMonthLabels
         self.excludeCurrentMonthLabel = excludeCurrentMonthLabel
         self.onHoverDay = onHoverDay
+        self.selectedDate = selectedDate
+        self.onSelectDay = onSelectDay
     }
 
     /// Days grouped into week columns (each column is 7 days, top = first weekday).
@@ -61,10 +69,17 @@ public struct ContributionGraphView: View {
                             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                                 .fill(color(for: day))
                                 .frame(width: cellSize, height: cellSize)
+                                .overlay {
+                                    if isSelected(day) {
+                                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                            .strokeBorder(Color.primary, lineWidth: max(1, cellSize * 0.14))
+                                    }
+                                }
                                 .contentShape(Rectangle())
                                 .accessibilityLabel(Text(accessibilityLabel(for: day)))
                                 .help(day.summary)
                                 .onHover { onHoverDay?($0 ? day : nil) }
+                                .onTapGesture { if day.isInRange { onSelectDay?(day) } }
                         }
                     }
                 }
@@ -75,6 +90,11 @@ public struct ContributionGraphView: View {
     private func color(for day: DayContribution) -> Color {
         guard day.isInRange else { return Theme.emptyCell.opacity(0.25) }
         return Theme.cellColor(level: day.level, accent: accent)
+    }
+
+    private func isSelected(_ day: DayContribution) -> Bool {
+        guard day.isInRange, let selected = selectedDate else { return false }
+        return Calendar.current.isDate(selected, inSameDayAs: day.date)
     }
 
     // MARK: Month labels
