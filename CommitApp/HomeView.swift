@@ -37,7 +37,8 @@ struct HomeView: View {
     private var horizontalPadding: CGFloat { 20 }
 
     private var todaysHabits: [Habit] {
-        habits.filter { $0.schedule.isScheduled(on: Date()) }
+        // Hide times-per-week / times-per-month habits once this period's target is met.
+        habits.filter { $0.schedule.isScheduled(on: Date()) && !$0.isPeriodTargetMet() }
     }
 
     private var upcomingHabits: [Habit] {

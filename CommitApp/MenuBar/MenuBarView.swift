@@ -19,7 +19,8 @@ struct MenuBarView: View {
     private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
 
     private var todaysHabits: [Habit] {
-        habits.filter { $0.schedule.isScheduled(on: Date()) }
+        // Hide times-per-week / times-per-month habits once this period's target is met.
+        habits.filter { $0.schedule.isScheduled(on: Date()) && !$0.isPeriodTargetMet() }
     }
     private var completedToday: Int {
         todaysHabits.filter { $0.isCompleted(on: Date()) }.count

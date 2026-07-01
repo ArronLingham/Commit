@@ -198,6 +198,20 @@ public extension Habit {
         return completedDaySet(calendar: calendar).filter { $0 >= monthStart && $0 <= monthEnd }.count
     }
 
+    /// For `.timesPerWeek` / `.timesPerMonth` habits, whether this period's target has already
+    /// been met — so the habit can drop off the list until the week/month rolls over. Always
+    /// `false` for other schedules.
+    func isPeriodTargetMet(asOf date: Date = Date(), calendar: Calendar = .current) -> Bool {
+        switch schedule {
+        case .timesPerWeek(let target):
+            return weeklyCompletionCount(asOf: date, calendar: calendar) >= target
+        case .timesPerMonth(let target):
+            return monthlyCompletionCount(asOf: date, calendar: calendar) >= target
+        default:
+            return false
+        }
+    }
+
     /// Current streak.
     ///
     /// For daily / weekday habits this counts consecutive *scheduled* days completed,
