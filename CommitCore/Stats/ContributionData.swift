@@ -152,17 +152,10 @@ public func makeContributions(
     while cursor <= gridEnd {
         let count = counts[cursor] ?? 0
         let inRange = cursor >= rangeStart && cursor <= rangeEnd
-        let scheduled = active.filter { habit in
-            guard habit.schedule.isScheduled(on: cursor, calendar: calendar) else { return false }
-            // A times-per-week / month habit drops out of the denominator once its target for
-            // the period is met — except on the day it was completed, so the "X of Y" numerator
-            // can never exceed the denominator.
-            if habit.isPeriodTargetMet(asOf: cursor, calendar: calendar),
-               !habit.isCompleted(on: cursor, calendar: calendar) {
-                return false
-            }
-            return true
-        }.count
+        // A times-per-week / month habit drops out of a day's denominator once its target for
+        // the period is met — except on the day it was completed, so the "X of Y" numerator can
+        // never exceed the denominator. (Shared with the Today list via `isDueForList`.)
+        let scheduled = active.filter { $0.isDueForList(on: cursor, calendar: calendar) }.count
         days.append(
             DayContribution(
                 date: cursor,
@@ -220,6 +213,19 @@ public extension Habit {
         default:
             return false
         }
+    }
+
+    /// Whether the habit belongs on the Today list (and in a day's graph denominator) for
+    /// `date`: it's scheduled that day and, for times-per-week / month habits, its period
+    /// target isn't already met — unless it was completed on `date` itself, so checking off
+    /// the last one doesn't make it vanish until the following day.
+    func isDueForList(on date: Date = AppClock.now, calendar: Calendar = .current) -> Bool {
+        guard schedule.isScheduled(on: date, calendar: calendar) else { return false }
+        if isPeriodTargetMet(asOf: date, calendar: calendar),
+           !isCompleted(on: date, calendar: calendar) {
+            return false
+        }
+        return true
     }
 
     /// Current streak.
