@@ -91,4 +91,59 @@ public enum HabitActions {
         }
         try? context.save()
     }
+
+    // MARK: Tester Mode session
+
+    private static let testerSnapshotKey = "testerCompletionSnapshot"
+
+    /// A stable "habitID|startOfDay" key so completions can be compared across a tester session.
+    private static func completionKey(habitID: UUID, day: Date, calendar: Calendar) -> String {
+        "\(habitID.uuidString)|\(Int(calendar.startOfDay(for: day).timeIntervalSinceReferenceDate))"
+    }
+
+    /// Snapshot the current (real) completion set when Tester Mode is turned on, so any
+    /// check-offs made while testing can be fully reverted afterwards.
+    public static func beginTesterSession(in context: ModelContext) {
+        let calendar = Calendar.current
+        let completions = (try? context.fetch(FetchDescriptor<HabitCompletion>())) ?? []
+        let keys = completions.compactMap { c -> String? in
+            guard !c.isDeleted, let habitID = c.habit?.id else { return nil }
+            return completionKey(habitID: habitID, day: c.day, calendar: calendar)
+        }
+        CommitConstants.sharedDefaults.set(Array(Set(keys)), forKey: testerSnapshotKey)
+    }
+
+    /// Revert every completion change made since `beginTesterSession`: delete completions added
+    /// while testing and restore ones that were un-checked, returning the store to the snapshot.
+    /// No-op if there's no snapshot (Tester Mode was never started).
+    public static func endTesterSession(in context: ModelContext) {
+        guard let stored = CommitConstants.sharedDefaults.array(forKey: testerSnapshotKey) as? [String] else { return }
+        let snapshot = Set(stored)
+        let calendar = Calendar.current
+
+        let habits = (try? context.fetch(FetchDescriptor<Habit>())) ?? []
+        let habitsByID = Dictionary(habits.map { ($0.id.uuidString, $0) }, uniquingKeysWith: { a, _ in a })
+
+        let completions = (try? context.fetch(FetchDescriptor<HabitCompletion>())) ?? []
+        var currentKeys = Set<String>()
+        for c in completions where !c.isDeleted {
+            guard let habitID = c.habit?.id else { continue }
+            let key = completionKey(habitID: habitID, day: c.day, calendar: calendar)
+            currentKeys.insert(key)
+            if !snapshot.contains(key) {
+                context.delete(c)            // added during testing → remove
+            }
+        }
+        for key in snapshot where !currentKeys.contains(key) {
+            let parts = key.split(separator: "|")
+            guard parts.count == 2,
+                  let habit = habitsByID[String(parts[0])],
+                  let seconds = Int(parts[1]) else { continue }
+            let day = Date(timeIntervalSinceReferenceDate: TimeInterval(seconds))
+            context.insert(HabitCompletion(day: day, habit: habit))   // un-checked during testing → restore
+        }
+
+        CommitConstants.sharedDefaults.removeObject(forKey: testerSnapshotKey)
+        try? context.save()
+    }
 }

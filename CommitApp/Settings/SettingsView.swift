@@ -3,6 +3,8 @@ import CommitCore
 
 /// Accent colour and about info.
 struct SettingsView: View {
+    @Environment(\.modelContext) private var context
+
     @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
     private var accentHex = Theme.defaultAccentHex
     private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
@@ -106,8 +108,15 @@ struct SettingsView: View {
         Section {
             Toggle("Tester mode", isOn: $testerModeEnabled)
                 .onChange(of: testerModeEnabled) { _, on in
-                    // Seed the override with the current picker value when switched on.
-                    if on { AppClock.overrideDate = testerDate }
+                    if on {
+                        // Seed the override with the current picker value and snapshot the real
+                        // data so everything checked off while testing can be reverted.
+                        AppClock.overrideDate = testerDate
+                        HabitActions.beginTesterSession(in: context)
+                    } else {
+                        // Undo every completion change made during the tester session.
+                        HabitActions.endTesterSession(in: context)
+                    }
                 }
             if testerModeEnabled {
                 DatePicker("Simulated date", selection: $testerDate, displayedComponents: .date)
@@ -129,7 +138,7 @@ struct SettingsView: View {
         } header: {
             Text("Tester Mode")
         } footer: {
-            Text("Overrides the app's current date so you can test schedules, streaks, and weekly / monthly targets. Turn it off to return to the real date. Completions you check off are still recorded on the simulated date.")
+            Text("Overrides the app's current date so you can test schedules, streaks, and weekly / monthly targets. Any habits you check or uncheck while Tester Mode is on are reverted when you turn it off, so your real history is left untouched.")
         }
     }
 
