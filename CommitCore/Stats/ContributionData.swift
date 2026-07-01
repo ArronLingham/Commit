@@ -152,7 +152,17 @@ public func makeContributions(
     while cursor <= gridEnd {
         let count = counts[cursor] ?? 0
         let inRange = cursor >= rangeStart && cursor <= rangeEnd
-        let scheduled = active.filter { $0.schedule.isScheduled(on: cursor, calendar: calendar) }.count
+        let scheduled = active.filter { habit in
+            guard habit.schedule.isScheduled(on: cursor, calendar: calendar) else { return false }
+            // A times-per-week / month habit drops out of the denominator once its target for
+            // the period is met — except on the day it was completed, so the "X of Y" numerator
+            // can never exceed the denominator.
+            if habit.isPeriodTargetMet(asOf: cursor, calendar: calendar),
+               !habit.isCompleted(on: cursor, calendar: calendar) {
+                return false
+            }
+            return true
+        }.count
         days.append(
             DayContribution(
                 date: cursor,
