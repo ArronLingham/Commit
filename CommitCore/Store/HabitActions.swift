@@ -16,7 +16,7 @@ public enum HabitActions {
     @discardableResult
     public static func toggleCompletion(
         for habit: Habit,
-        on date: Date = Date(),
+        on date: Date = AppClock.now,
         in context: ModelContext
     ) -> Bool {
         let calendar = Calendar.current

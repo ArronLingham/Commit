@@ -17,13 +17,18 @@ struct MenuBarView: View {
     @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
     private var accentHex = Theme.defaultAccentHex
     private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
+    // Observed only so the popover re-renders when Tester Mode changes the simulated date.
+    @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
+    private var testerEnabled = false
+    @AppStorage(AppClock.overrideKey, store: CommitConstants.sharedDefaults)
+    private var testerOverride = 0.0
 
     private var todaysHabits: [Habit] {
         // Hide times-per-week / times-per-month habits once this period's target is met.
-        habits.filter { $0.schedule.isScheduled(on: Date()) && !$0.isPeriodTargetMet() }
+        habits.filter { $0.schedule.isScheduled(on: AppClock.now) && !$0.isPeriodTargetMet() }
     }
     private var completedToday: Int {
-        todaysHabits.filter { $0.isCompleted(on: Date()) }.count
+        todaysHabits.filter { $0.isCompleted(on: AppClock.now) }.count
     }
 
     var body: some View {
@@ -60,7 +65,7 @@ struct MenuBarView: View {
             } else {
                 VStack(spacing: 6) {
                     ForEach(todaysHabits) { habit in
-                        MenuBarHabitRow(habit: habit, accent: accent) {
+                        MenuBarHabitRow(habit: habit, accent: accent, now: AppClock.now) {
                             if HabitActions.toggleCompletion(for: habit, in: context) {
                                 SoundEffects.playCheck()
                             }
@@ -90,10 +95,11 @@ struct MenuBarView: View {
 private struct MenuBarHabitRow: View {
     let habit: Habit
     let accent: Color
+    let now: Date
     let toggle: () -> Void
 
     private var habitColor: Color { Color(hex: habit.colorHex) ?? accent }
-    private var done: Bool { habit.isCompleted(on: Date()) }
+    private var done: Bool { habit.isCompleted(on: now) }
 
     var body: some View {
         Button(action: toggle) {
@@ -106,7 +112,7 @@ private struct MenuBarHabitRow: View {
                 Text(habit.name.isEmpty ? "Untitled" : habit.name)
                     .foregroundStyle(.primary)
                 Spacer()
-                let streak = habit.currentStreak()
+                let streak = habit.currentStreak(asOf: now)
                 if streak > 0 {
                     Text("🔥\(streak)").font(.caption).foregroundStyle(.secondary)
                 }

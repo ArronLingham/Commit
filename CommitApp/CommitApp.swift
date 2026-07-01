@@ -32,7 +32,7 @@ struct CommitApp: App {
         Settings {
             SettingsView()
                 .modelContainer(container)
-                .frame(width: 420, height: 360)
+                .frame(width: 420, height: 460)
         }
         #endif
     }

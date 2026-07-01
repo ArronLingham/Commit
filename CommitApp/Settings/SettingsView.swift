@@ -18,12 +18,17 @@ struct SettingsView: View {
     @AppStorage(showMenuBarIconKey, store: CommitConstants.sharedDefaults)
     private var showMenuBarIcon = true
 
+    @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
+    private var testerModeEnabled = false
+    @State private var testerDate = AppClock.overrideDate
+
     var body: some View {
         Form {
             accentSection
             reminderSection
             layoutSection
             menuBarSection
+            testerSection
             aboutSection
         }
         .formStyle(.grouped)
@@ -93,6 +98,49 @@ struct SettingsView: View {
         } footer: {
             Text("Hide the checkmark from the menu bar. You can still open Commit from the Dock or Applications.")
         }
+    }
+
+    // MARK: Tester mode
+
+    private var testerSection: some View {
+        Section {
+            Toggle("Tester mode", isOn: $testerModeEnabled)
+                .onChange(of: testerModeEnabled) { _, on in
+                    // Seed the override with the current picker value when switched on.
+                    if on { AppClock.overrideDate = testerDate }
+                }
+            if testerModeEnabled {
+                DatePicker("Simulated date", selection: $testerDate, displayedComponents: .date)
+                    .onChange(of: testerDate) { _, newValue in
+                        AppClock.overrideDate = newValue
+                    }
+                HStack {
+                    Button("−1 day") { shiftTesterDate(by: -1) }
+                    Spacer()
+                    Button("Today") { setTesterDate(Date()) }
+                    Spacer()
+                    Button("+1 day") { shiftTesterDate(by: 1) }
+                }
+                LabeledContent("App thinks it's",
+                               value: testerDate.formatted(date: .complete, time: .omitted))
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+        } header: {
+            Text("Tester Mode")
+        } footer: {
+            Text("Overrides the app's current date so you can test schedules, streaks, and weekly / monthly targets. Turn it off to return to the real date. Completions you check off are still recorded on the simulated date.")
+        }
+    }
+
+    private func shiftTesterDate(by days: Int) {
+        let shifted = Calendar.current.date(byAdding: .day, value: days, to: testerDate) ?? testerDate
+        setTesterDate(shifted)
+    }
+
+    private func setTesterDate(_ date: Date) {
+        testerDate = date
+        AppClock.overrideDate = date
     }
 
     // MARK: Accent

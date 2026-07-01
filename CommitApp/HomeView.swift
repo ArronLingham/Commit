@@ -31,6 +31,11 @@ struct HomeView: View {
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
+    // Observed only so the page re-renders when Tester Mode changes the simulated date.
+    @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
+    private var testerEnabled = false
+    @AppStorage(AppClock.overrideKey, store: CommitConstants.sharedDefaults)
+    private var testerOverride = 0.0
 
     /// Width of the centred content column; also drives the year graph's fit-to-width sizing.
     private let contentWidth: CGFloat = 660
@@ -38,20 +43,20 @@ struct HomeView: View {
 
     private var todaysHabits: [Habit] {
         // Hide times-per-week / times-per-month habits once this period's target is met.
-        habits.filter { $0.schedule.isScheduled(on: Date()) && !$0.isPeriodTargetMet() }
+        habits.filter { $0.schedule.isScheduled(on: AppClock.now) && !$0.isPeriodTargetMet() }
     }
 
     private var upcomingHabits: [Habit] {
-        habits.filter { !$0.schedule.isScheduled(on: Date()) }
+        habits.filter { !$0.schedule.isScheduled(on: AppClock.now) }
             .sorted { ($0.schedule.nextDate() ?? .distantFuture) < ($1.schedule.nextDate() ?? .distantFuture) }
     }
 
     private var contributions: Contributions {
         let range: ContributionGraphRange
         switch span {
-        case .week: range = .week(Date())
-        case .month: range = .month(Date())
-        case .year: range = .calendarYear(Date())
+        case .week: range = .week(AppClock.now)
+        case .month: range = .month(AppClock.now)
+        case .year: range = .calendarYear(AppClock.now)
         }
         return makeContributions(habits: habits, range: range)
     }
@@ -155,7 +160,7 @@ struct HomeView: View {
         let columns = Array(repeating: GridItem(.fixed(cell), spacing: spacing), count: 7)
 
         return VStack(spacing: 10) {
-            Text(Date().formatted(.dateTime.month(.wide).year()))
+            Text(AppClock.now.formatted(.dateTime.month(.wide).year()))
                 .font(.title3.weight(.semibold))
                 .lineLimit(1)
 
@@ -244,7 +249,7 @@ struct HomeView: View {
     @ViewBuilder
     private var dayDetail: some View {
         if let day = selectedDay {
-            let isFuture = Calendar.current.startOfDay(for: day) > Calendar.current.startOfDay(for: Date())
+            let isFuture = Calendar.current.startOfDay(for: day) > Calendar.current.startOfDay(for: AppClock.now)
             let dayHabits = habitsScheduled(on: day)
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 16) {
@@ -378,7 +383,7 @@ struct HomeView: View {
             )
         } else {
             ForEach(habits) { habit in
-                if habit.schedule.isScheduled(on: Date()) {
+                if habit.schedule.isScheduled(on: AppClock.now) {
                     checkableRow(habit)
                 } else {
                     infoRow(habit)
@@ -398,7 +403,7 @@ struct HomeView: View {
 
     /// A checkable habit row (today's habits) with an edit/delete context menu.
     private func checkableRow(_ habit: Habit) -> some View {
-        HabitRow(habit: habit, accent: accent) {
+        HabitRow(habit: habit, accent: accent, now: AppClock.now) {
             let nowDone = withAnimation(.snappy) {
                 HabitActions.toggleCompletion(for: habit, in: context)
             }
@@ -485,10 +490,12 @@ struct HomeView: View {
 struct HabitRow: View {
     let habit: Habit
     let accent: Color
+    /// The app's current date (from AppClock) — passed in so the row refreshes under Tester Mode.
+    let now: Date
     let toggle: () -> Void
 
     private var habitColor: Color { Color(hex: habit.colorHex) ?? accent }
-    private var done: Bool { habit.isCompleted(on: Date()) }
+    private var done: Bool { habit.isCompleted(on: now) }
 
     var body: some View {
         Button(action: toggle) {
@@ -521,12 +528,12 @@ struct HabitRow: View {
 
     private var subtitle: String {
         var parts: [String] = []
-        let streak = habit.currentStreak()
+        let streak = habit.currentStreak(asOf: now)
         if streak > 0 { parts.append("🔥 \(streak)") }
         if case .timesPerWeek(let target) = habit.schedule {
-            parts.append("\(habit.weeklyCompletionCount())/\(target) this week")
+            parts.append("\(habit.weeklyCompletionCount(asOf: now))/\(target) this week")
         } else if case .timesPerMonth(let target) = habit.schedule {
-            parts.append("\(habit.monthlyCompletionCount())/\(target) this month")
+            parts.append("\(habit.monthlyCompletionCount(asOf: now))/\(target) this month")
         } else {
             parts.append(habit.schedule.shortDescription())
         }

@@ -125,7 +125,7 @@ public func makeContributions(
     habits: [Habit],
     range: ContributionGraphRange,
     calendar: Calendar = .current,
-    referenceDate: Date = Date()
+    referenceDate: Date = AppClock.now
 ) -> Contributions {
     let (primaryStart, primaryEnd) = range.bounds(calendar: calendar, reference: referenceDate)
     let gridStart = calendar.startOfWeek(for: primaryStart)
@@ -182,14 +182,14 @@ public extension Habit {
     }
 
     /// Completions within the calendar week containing `date`.
-    func weeklyCompletionCount(asOf date: Date = Date(), calendar: Calendar = .current) -> Int {
+    func weeklyCompletionCount(asOf date: Date = AppClock.now, calendar: Calendar = .current) -> Int {
         let weekStart = calendar.startOfWeek(for: date)
         let weekEnd = calendar.endOfWeek(for: date)
         return completedDaySet(calendar: calendar).filter { $0 >= weekStart && $0 <= weekEnd }.count
     }
 
     /// Completions within the calendar month containing `date`.
-    func monthlyCompletionCount(asOf date: Date = Date(), calendar: Calendar = .current) -> Int {
+    func monthlyCompletionCount(asOf date: Date = AppClock.now, calendar: Calendar = .current) -> Int {
         let comps = calendar.dateComponents([.year, .month], from: date)
         guard let monthStart = calendar.date(from: comps),
               let range = calendar.range(of: .day, in: .month, for: monthStart),
@@ -201,7 +201,7 @@ public extension Habit {
     /// For `.timesPerWeek` / `.timesPerMonth` habits, whether this period's target has already
     /// been met — so the habit can drop off the list until the week/month rolls over. Always
     /// `false` for other schedules.
-    func isPeriodTargetMet(asOf date: Date = Date(), calendar: Calendar = .current) -> Bool {
+    func isPeriodTargetMet(asOf date: Date = AppClock.now, calendar: Calendar = .current) -> Bool {
         switch schedule {
         case .timesPerWeek(let target):
             return weeklyCompletionCount(asOf: date, calendar: calendar) >= target
@@ -218,7 +218,7 @@ public extension Habit {
     /// skipping non-scheduled days (so a Mon/Wed/Fri habit doesn't break on Tuesday) and
     /// not breaking on today if today simply hasn't been done yet.
     /// For `timesPerWeek` habits it counts consecutive weeks that met the target.
-    func currentStreak(asOf date: Date = Date(), calendar: Calendar = .current) -> Int {
+    func currentStreak(asOf date: Date = AppClock.now, calendar: Calendar = .current) -> Int {
         let completed = completedDaySet(calendar: calendar)
 
         if case .timesPerWeek(let target) = schedule {

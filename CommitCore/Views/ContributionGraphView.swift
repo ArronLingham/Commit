@@ -107,7 +107,7 @@ public struct ContributionGraphView: View {
 
     private func monthMarkers() -> [MonthMarker] {
         let calendar = Calendar.current
-        let currentMonthSymbol = calendar.shortMonthSymbols[calendar.component(.month, from: Date()) - 1]
+        let currentMonthSymbol = calendar.shortMonthSymbols[calendar.component(.month, from: AppClock.now) - 1]
         var result: [MonthMarker] = []
         for (idx, week) in weeks.enumerated() {
             let label = monthLabel(weekIndex: idx, week: week)

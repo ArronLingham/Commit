@@ -102,7 +102,7 @@ public enum Schedule: Equatable, Hashable, Sendable {
 
     /// The next date strictly after `date` on which the habit is scheduled (searches up to a
     /// year-plus ahead). Returns nil if nothing matches within the window.
-    public func nextDate(after date: Date = Date(), calendar: Calendar = .current) -> Date? {
+    public func nextDate(after date: Date = AppClock.now, calendar: Calendar = .current) -> Date? {
         let start = calendar.startOfDay(for: date)
         for offset in 1...400 {
             guard let candidate = calendar.date(byAdding: .day, value: offset, to: start) else { continue }
