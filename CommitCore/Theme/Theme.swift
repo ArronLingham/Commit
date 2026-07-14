@@ -39,6 +39,41 @@ public enum Theme {
         }
     }
 
+    // MARK: Graph colour scheme
+
+    /// Semantic colours for the "informative" (green → yellow → red) scheme.
+    public static let missNoneGreen = Color(hex: "#39D353") ?? .green   // 0 missed
+    public static let missOneGreen  = Color(hex: "#26A641") ?? .green   // 1 missed
+    public static let missFewYellow = Color(hex: "#E3B341") ?? .yellow  // 2–3 missed
+    public static let missManyRed   = Color(hex: "#F85149") ?? .red     // 4+ missed
+
+    /// Colour for a day's cell under the chosen scheme.
+    ///
+    /// - `.githubGreen`: intensity by how much of the day was completed, all in the accent hue.
+    /// - `.informative`: blunt read by how many scheduled habits were **missed** that day —
+    ///   0 → brightest green, 1 → a step-down green, 2–3 → yellow, 4+ → red. Days with nothing
+    ///   scheduled, and days still in the future, stay neutral so they're never painted red.
+    public static func cellColor(day: DayContribution, scheme: GraphColorScheme, accent: Color) -> Color {
+        guard day.isInRange else { return emptyCell.opacity(0.25) }
+
+        switch scheme {
+        case .githubGreen:
+            return cellColor(level: day.level, accent: accent)
+
+        case .informative:
+            let calendar = Calendar.current
+            let isFuture = calendar.startOfDay(for: day.date) > calendar.startOfDay(for: AppClock.now)
+            if day.scheduled == 0 || isFuture { return emptyCell.opacity(0.5) }
+
+            switch max(0, day.scheduled - day.count) {
+            case 0: return missNoneGreen
+            case 1: return missOneGreen
+            case 2...3: return missFewYellow
+            default: return missManyRed
+            }
+        }
+    }
+
     /// The user's chosen accent, read from the shared App Group defaults so the widget
     /// matches the app.
     public static func currentAccent() -> Color {
@@ -49,6 +84,25 @@ public enum Theme {
     public static func setAccent(hex: String) {
         CommitConstants.sharedDefaults.set(hex, forKey: accentColorHexKey)
     }
+}
+
+/// How the contribution graph colours its cells. User-selectable in Settings.
+public enum GraphColorScheme: String, CaseIterable, Identifiable, Sendable {
+    /// All-green, intensity by how much of the day was completed (classic GitHub look).
+    case githubGreen
+    /// Green → yellow → red by how many scheduled habits were missed that day.
+    case informative
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .githubGreen: return "GitHub green"
+        case .informative: return "Green · yellow · red"
+        }
+    }
+
+    public static let storageKey = "graphColorScheme"
 }
 
 public extension Color {

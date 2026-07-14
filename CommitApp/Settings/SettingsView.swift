@@ -24,9 +24,13 @@ struct SettingsView: View {
     private var testerModeEnabled = false
     @State private var testerDate = AppClock.overrideDate
 
+    @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
+    private var colorScheme: GraphColorScheme = .githubGreen
+
     var body: some View {
         Form {
             accentSection
+            graphColorSection
             reminderSection
             layoutSection
             menuBarSection
@@ -150,6 +154,24 @@ struct SettingsView: View {
     private func setTesterDate(_ date: Date) {
         testerDate = date
         AppClock.overrideDate = date
+    }
+
+    // MARK: Graph colours
+
+    private var graphColorSection: some View {
+        Section {
+            Picker("Colour scheme", selection: $colorScheme) {
+                ForEach(GraphColorScheme.allCases) { scheme in
+                    Text(scheme.label).tag(scheme)
+                }
+            }
+            ContributionLegend(accent: accent, cellSize: 14, scheme: colorScheme)
+                .padding(.vertical, 2)
+        } header: {
+            Text("Graph colours")
+        } footer: {
+            Text("GitHub green shades every day by how much you completed. Green · yellow · red is blunter: a day is green if you finished it, and turns yellow then red the more habits you missed.")
+        }
     }
 
     // MARK: Accent

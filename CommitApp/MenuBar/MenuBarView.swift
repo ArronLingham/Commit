@@ -22,6 +22,8 @@ struct MenuBarView: View {
     private var testerEnabled = false
     @AppStorage(AppClock.overrideKey, store: CommitConstants.sharedDefaults)
     private var testerOverride = 0.0
+    @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
+    private var colorScheme: GraphColorScheme = .githubGreen
 
     private var todaysHabits: [Habit] {
         // Hide times-per-week / month habits once the target is met — but not on the day you
@@ -52,6 +54,7 @@ struct MenuBarView: View {
                 cellSize: menuCell,
                 spacing: menuSpacing,
                 accent: accent,
+                scheme: colorScheme,
                 showMonthLabels: false
             )
 

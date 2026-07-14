@@ -8,6 +8,7 @@ public struct ContributionGraphView: View {
     public var cellSize: CGFloat
     public var spacing: CGFloat
     public var accent: Color
+    public var scheme: GraphColorScheme
     public var showMonthLabels: Bool
     /// When true, the month label for the current calendar month is omitted (used by the
     /// year view, whose trailing/leading partial month would otherwise crowd the edge).
@@ -24,6 +25,7 @@ public struct ContributionGraphView: View {
         cellSize: CGFloat = 11,
         spacing: CGFloat = 3,
         accent: Color = Theme.defaultAccent,
+        scheme: GraphColorScheme = .githubGreen,
         showMonthLabels: Bool = true,
         excludeCurrentMonthLabel: Bool = false,
         onHoverDay: ((DayContribution?) -> Void)? = nil,
@@ -34,6 +36,7 @@ public struct ContributionGraphView: View {
         self.cellSize = cellSize
         self.spacing = spacing
         self.accent = accent
+        self.scheme = scheme
         self.showMonthLabels = showMonthLabels
         self.excludeCurrentMonthLabel = excludeCurrentMonthLabel
         self.onHoverDay = onHoverDay
@@ -88,8 +91,7 @@ public struct ContributionGraphView: View {
     }
 
     private func color(for day: DayContribution) -> Color {
-        guard day.isInRange else { return Theme.emptyCell.opacity(0.25) }
-        return Theme.cellColor(level: day.level, accent: accent)
+        Theme.cellColor(day: day, scheme: scheme, accent: accent)
     }
 
     private func isSelected(_ day: DayContribution) -> Bool {
@@ -159,25 +161,43 @@ public struct ContributionGraphView: View {
     }
 }
 
-/// Compact horizontal legend ("Less ▢▢▢▢ More") matching the cell scale.
+/// Compact horizontal legend matching the cell scale. For the GitHub-green scheme it reads
+/// "Less ▢▢▢▢ More"; for the informative scheme it reads "All done ▢▢▢▢ Missed 4+".
 public struct ContributionLegend: View {
     public var accent: Color
     public var cellSize: CGFloat
+    public var scheme: GraphColorScheme
 
-    public init(accent: Color = Theme.defaultAccent, cellSize: CGFloat = 10) {
+    public init(accent: Color = Theme.defaultAccent, cellSize: CGFloat = 10, scheme: GraphColorScheme = .githubGreen) {
         self.accent = accent
         self.cellSize = cellSize
+        self.scheme = scheme
     }
 
+    private var corner: CGFloat { max(2, cellSize * 0.22) }
+
     public var body: some View {
-        HStack(spacing: 4) {
-            Text("Less").font(.caption2).foregroundStyle(.secondary)
-            ForEach(0...4, id: \.self) { level in
-                RoundedRectangle(cornerRadius: max(2, cellSize * 0.22), style: .continuous)
-                    .fill(Theme.cellColor(level: level, accent: accent))
-                    .frame(width: cellSize, height: cellSize)
+        switch scheme {
+        case .githubGreen:
+            HStack(spacing: 4) {
+                Text("Less").font(.caption2).foregroundStyle(.secondary)
+                ForEach(0...4, id: \.self) { level in
+                    RoundedRectangle(cornerRadius: corner, style: .continuous)
+                        .fill(Theme.cellColor(level: level, accent: accent))
+                        .frame(width: cellSize, height: cellSize)
+                }
+                Text("More").font(.caption2).foregroundStyle(.secondary)
             }
-            Text("More").font(.caption2).foregroundStyle(.secondary)
+        case .informative:
+            HStack(spacing: 4) {
+                Text("All done").font(.caption2).foregroundStyle(.secondary)
+                ForEach([Theme.missNoneGreen, Theme.missOneGreen, Theme.missFewYellow, Theme.missManyRed], id: \.self) { swatch in
+                    RoundedRectangle(cornerRadius: corner, style: .continuous)
+                        .fill(swatch)
+                        .frame(width: cellSize, height: cellSize)
+                }
+                Text("Missed 4+").font(.caption2).foregroundStyle(.secondary)
+            }
         }
     }
 }

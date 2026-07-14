@@ -92,6 +92,15 @@ public enum HabitActions {
         try? context.save()
     }
 
+    /// Persist a new ordering: rewrite each habit's `sortOrder` to its index in `ordered`.
+    public static func reorder(_ ordered: [Habit], in context: ModelContext) {
+        for (index, habit) in ordered.enumerated() where habit.sortOrder != index {
+            habit.sortOrder = index
+            habit.updatedAt = Date()
+        }
+        try? context.save()
+    }
+
     // MARK: Tester Mode session
 
     private static let testerSnapshotKey = "testerCompletionSnapshot"

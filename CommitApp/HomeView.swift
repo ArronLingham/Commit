@@ -27,10 +27,13 @@ struct HomeView: View {
     @State private var editing: Habit?
     @State private var hoveredDay: DayContribution?
     @State private var selectedDay: Date?
+    @State private var showingManage = false
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
+    @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
+    private var colorScheme: GraphColorScheme = .githubGreen
     // Observed only so the page re-renders when Tester Mode changes the simulated date.
     @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
     private var testerEnabled = false
@@ -87,6 +90,9 @@ struct HomeView: View {
             .sheet(item: $editing) { habit in
                 HabitEditView(habit: habit)
             }
+            .sheet(isPresented: $showingManage) {
+                ManageHabitsView()
+            }
         }
     }
 
@@ -95,7 +101,7 @@ struct HomeView: View {
     private var graphSection: some View {
         VStack(spacing: 12) {
             graph
-            ContributionLegend(accent: accent)
+            ContributionLegend(accent: accent, scheme: colorScheme)
             // Updates as you hover a cell (also shown as a native tooltip via .help).
             Text(hoveredDay?.summary ?? " ")
                 .font(.caption)
@@ -126,9 +132,7 @@ struct HomeView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(day.isInRange
-                              ? Theme.cellColor(level: day.level, accent: accent)
-                              : Theme.emptyCell.opacity(0.25))
+                        .fill(Theme.cellColor(day: day, scheme: colorScheme, accent: accent))
                         .frame(width: 36, height: 36)
                         .overlay {
                             if isSelected(day) {
@@ -185,7 +189,7 @@ struct HomeView: View {
 
     private func monthDayCell(_ day: DayContribution, size: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(day.isInRange ? Theme.cellColor(level: day.level, accent: accent) : Color.clear)
+            .fill(day.isInRange ? Theme.cellColor(day: day, scheme: colorScheme, accent: accent) : Color.clear)
             .frame(width: size, height: size)
             .overlay {
                 if isSelected(day) {
@@ -214,6 +218,7 @@ struct HomeView: View {
             cellSize: cell,
             spacing: spacing,
             accent: accent,
+            scheme: colorScheme,
             showMonthLabels: true,
             onHoverDay: { hoveredDay = $0 },
             selectedDate: selectedDay,
@@ -323,22 +328,46 @@ struct HomeView: View {
 
     /// Today's habits plus, depending on the user's Settings choice, the habits that aren't
     /// due today (an Upcoming section, a Today/All toggle, or a collapsible list).
-    @ViewBuilder
     private var habitsArea: some View {
-        switch otherHabitsStyle {
-        case .upcoming:
-            todaySectionView
-            if !upcomingHabits.isEmpty { upcomingSection }
+        VStack(alignment: .leading, spacing: 12) {
+            habitsHeader
+            habitsContent
             quickAdd
-        case .toggle:
-            VStack(alignment: .leading, spacing: 8) {
+        }
+    }
+
+    /// Row under the graph: the Today/All scope toggle (in that layout) on the left, and the
+    /// "edit habits" button that opens the full manager on the right — across from the scope.
+    private var habitsHeader: some View {
+        HStack(spacing: 12) {
+            if otherHabitsStyle == .toggle {
                 Picker("Scope", selection: $scope) {
                     ForEach(Scope.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                if scope == .today { todayRows } else { allHabitsRows }
+                .fixedSize()
             }
-            quickAdd
+            Spacer()
+            Button {
+                showingManage = true
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Edit habits")
+        }
+    }
+
+    @ViewBuilder
+    private var habitsContent: some View {
+        switch otherHabitsStyle {
+        case .upcoming:
+            todaySectionView
+            if !upcomingHabits.isEmpty { upcomingSection }
+        case .toggle:
+            if scope == .today { todayRows } else { allHabitsRows }
         case .collapsible:
             todaySectionView
             if !upcomingHabits.isEmpty {
@@ -348,7 +377,6 @@ struct HomeView: View {
                     }
                 }
             }
-            quickAdd
         }
     }
 
