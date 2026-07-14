@@ -44,24 +44,29 @@ public struct DayContribution: Identifiable, Sendable, Hashable {
     public let level: Int
     /// Whether the day falls inside the requested range (vs. week-alignment padding).
     public let isInRange: Bool
-    /// Number of active habits scheduled on this day (the "out of" denominator for tooltips).
+    /// Number of habit obligations *assessed* on this day (the "out of" denominator). For
+    /// times-per-week / month habits this is only non-zero on the last day of their period.
     public let scheduled: Int
+    /// How many of those assessed obligations were missed on this day (drives the informative
+    /// colour scheme). Always 0 on future days.
+    public let missed: Int
 
-    public init(date: Date, count: Int, level: Int, isInRange: Bool, scheduled: Int = 0) {
+    public init(date: Date, count: Int, level: Int, isInRange: Bool, scheduled: Int = 0, missed: Int = 0) {
         self.date = date
         self.count = count
         self.level = level
         self.isInRange = isInRange
         self.scheduled = scheduled
+        self.missed = missed
     }
 
     public var id: Date { date }
 
-    /// Human-readable summary for hover tooltips, e.g. "Jun 3, 2026 — 2 of 3 completed".
+    /// Human-readable summary for hover tooltips, e.g. "Jun 3, 2026 — 2 of 3 done".
     public var summary: String {
         let dateText = date.formatted(date: .abbreviated, time: .omitted)
         return scheduled > 0
-            ? "\(dateText) — \(count) of \(scheduled) completed"
+            ? "\(dateText) — \(scheduled - missed) of \(scheduled) done"
             : "\(dateText) — \(count) completed"
     }
 }
@@ -146,29 +151,65 @@ public func makeContributions(
 
     let rangeStart = calendar.startOfDay(for: primaryStart)
     let rangeEnd = calendar.startOfDay(for: primaryEnd)
+    let today = calendar.startOfDay(for: referenceDate)
 
     var days: [DayContribution] = []
     var cursor = gridStart
     while cursor <= gridEnd {
         let count = counts[cursor] ?? 0
         let inRange = cursor >= rangeStart && cursor <= rangeEnd
-        // A times-per-week / month habit drops out of a day's denominator once its target for
-        // the period is met — except on the day it was completed, so the "X of Y" numerator can
-        // never exceed the denominator. (Shared with the Today list via `isDueForList`.)
-        let scheduled = active.filter { $0.isDueForList(on: cursor, calendar: calendar) }.count
+        let (scheduled, missed) = assess(active, on: cursor, today: today, calendar: calendar)
         days.append(
             DayContribution(
                 date: cursor,
                 count: count,
                 level: ContributionLevel.level(count: count, max: denom),
                 isInRange: inRange,
-                scheduled: scheduled
+                scheduled: scheduled,
+                missed: missed
             )
         )
         cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? gridEnd.addingTimeInterval(86_400)
     }
 
     return Contributions(days: days, gridStart: gridStart, gridEnd: gridEnd, maxPerDay: denom)
+}
+
+/// How many habit obligations fall on `day`, and how many of those were missed. Times-per-week /
+/// month habits are only assessed on the last day of their period (and never in the future), so
+/// they don't paint the whole period as missed before they're actually due.
+private func assess(
+    _ habits: [Habit],
+    on day: Date,
+    today: Date,
+    calendar: Calendar
+) -> (scheduled: Int, missed: Int) {
+    guard day <= today else { return (0, 0) }   // future days: nothing assessed yet
+
+    var scheduled = 0
+    var missed = 0
+    for habit in habits {
+        switch habit.schedule {
+        case .timesPerWeek(let n):
+            guard calendar.isDate(day, inSameDayAs: calendar.endOfWeek(for: day)) else { continue }
+            scheduled += 1
+            if habit.weeklyCompletionCount(asOf: day, calendar: calendar) < n { missed += 1 }
+        case .timesPerMonth(let n):
+            guard isLastDayOfMonth(day, calendar: calendar) else { continue }
+            scheduled += 1
+            if habit.monthlyCompletionCount(asOf: day, calendar: calendar) < n { missed += 1 }
+        default:
+            guard habit.schedule.isScheduled(on: day, calendar: calendar) else { continue }
+            scheduled += 1
+            if !habit.isCompleted(on: day, calendar: calendar) { missed += 1 }
+        }
+    }
+    return (scheduled, missed)
+}
+
+private func isLastDayOfMonth(_ day: Date, calendar: Calendar) -> Bool {
+    guard let range = calendar.range(of: .day, in: .month, for: day) else { return false }
+    return calendar.component(.day, from: day) == range.count
 }
 
 // MARK: - Per-habit stats

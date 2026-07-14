@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 import CommitCore
 
 /// The app's single page: a centered GitHub-style contribution graph with a Week / Month /
@@ -27,7 +28,8 @@ struct HomeView: View {
     @State private var editing: Habit?
     @State private var hoveredDay: DayContribution?
     @State private var selectedDay: Date?
-    @State private var showingManage = false
+    @State private var isEditing = false
+    @State private var draggingHabit: Habit?
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
@@ -89,9 +91,6 @@ struct HomeView: View {
             }
             .sheet(item: $editing) { habit in
                 HabitEditView(habit: habit)
-            }
-            .sheet(isPresented: $showingManage) {
-                ManageHabitsView()
             }
         }
     }
@@ -331,16 +330,23 @@ struct HomeView: View {
     private var habitsArea: some View {
         VStack(alignment: .leading, spacing: 12) {
             habitsHeader
-            habitsContent
-            quickAdd
+            if isEditing {
+                editList
+                quickAdd
+            } else {
+                habitsContent
+            }
         }
     }
 
     /// Row under the graph: the Today/All scope toggle (in that layout) on the left, and the
-    /// "edit habits" button that opens the full manager on the right — across from the scope.
+    /// notepad button on the right — across from the scope — that toggles inline edit mode.
     private var habitsHeader: some View {
         HStack(spacing: 12) {
-            if otherHabitsStyle == .toggle {
+            if isEditing {
+                Text("Edit habits")
+                    .font(.headline)
+            } else if otherHabitsStyle == .toggle {
                 Picker("Scope", selection: $scope) {
                     ForEach(Scope.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -349,14 +355,14 @@ struct HomeView: View {
             }
             Spacer()
             Button {
-                showingManage = true
+                withAnimation(.snappy) { isEditing.toggle() }
             } label: {
-                Image(systemName: "square.and.pencil")
+                Image(systemName: isEditing ? "checkmark.circle.fill" : "square.and.pencil")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isEditing ? accent : .secondary)
             }
             .buttonStyle(.plain)
-            .help("Edit habits")
+            .help(isEditing ? "Done" : "Edit habits")
         }
     }
 
@@ -378,6 +384,81 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    // MARK: Edit mode
+
+    /// A flat, drag-reorderable list of every habit shown while editing.
+    @ViewBuilder
+    private var editList: some View {
+        if habits.isEmpty {
+            ContentUnavailableView(
+                "No habits yet",
+                systemImage: "leaf",
+                description: Text("Add your first habit below.")
+            )
+        } else {
+            VStack(spacing: 6) {
+                ForEach(habits) { habit in
+                    editRow(habit)
+                        .opacity(draggingHabit?.id == habit.id ? 0.4 : 1)
+                        .onDrag {
+                            draggingHabit = habit
+                            return NSItemProvider(object: habit.id.uuidString as NSString)
+                        }
+                        .onDrop(
+                            of: [.text],
+                            delegate: HabitReorderDropDelegate(
+                                target: habit,
+                                habits: habits,
+                                dragging: $draggingHabit,
+                                context: context
+                            )
+                        )
+                }
+            }
+        }
+    }
+
+    /// A habit row in edit mode: drag handle, delete, name/schedule, and a pencil to edit fields.
+    private func editRow(_ habit: Habit) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.tertiary)
+            Button {
+                withAnimation(.snappy) { HabitActions.softDelete(habit, in: context) }
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+            .help("Delete habit")
+
+            Image(systemName: habit.iconName)
+                .foregroundStyle(Color(hex: habit.colorHex) ?? accent)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(habit.name.isEmpty ? "Untitled" : habit.name)
+                    .foregroundStyle(.primary)
+                Text(habit.schedule.shortDescription())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                editing = habit
+            } label: {
+                Image(systemName: "pencil")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Edit habit")
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .contentShape(Rectangle())
     }
 
     private var todaySectionView: some View {
@@ -567,5 +648,32 @@ struct HabitRow: View {
             parts.append(habit.schedule.shortDescription())
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// Live drag-to-reorder for the edit-mode habit list: as the dragged habit hovers over a row,
+/// it's moved to that row's position and the new order is persisted via `HabitActions.reorder`.
+private struct HabitReorderDropDelegate: DropDelegate {
+    let target: Habit
+    let habits: [Habit]
+    @Binding var dragging: Habit?
+    let context: ModelContext
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging.id != target.id,
+              let from = habits.firstIndex(where: { $0.id == dragging.id }),
+              let to = habits.firstIndex(where: { $0.id == target.id })
+        else { return }
+
+        var reordered = habits
+        reordered.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        HabitActions.reorder(reordered, in: context)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
     }
 }

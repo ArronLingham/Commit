@@ -41,11 +41,12 @@ public enum Theme {
 
     // MARK: Graph colour scheme
 
-    /// Semantic colours for the "informative" (green → yellow → red) scheme.
-    public static let missNoneGreen = Color(hex: "#39D353") ?? .green   // 0 missed
-    public static let missOneGreen  = Color(hex: "#26A641") ?? .green   // 1 missed
-    public static let missFewYellow = Color(hex: "#E3B341") ?? .yellow  // 2–3 missed
-    public static let missManyRed   = Color(hex: "#F85149") ?? .red     // 4+ missed
+    /// Semantic colours for the "informative" (green → yellow → red) scheme. Muted "Soft" set —
+    /// for a richer look swap in the "Deep" values: #2E7D46 / #6BA368 / #C99A3B / #B4453F.
+    public static let missNoneGreen = Color(hex: "#4CAF6E") ?? .green   // 0 missed
+    public static let missOneGreen  = Color(hex: "#8BC28A") ?? .green   // 1 missed
+    public static let missFewYellow = Color(hex: "#E0B152") ?? .yellow  // 2–3 missed
+    public static let missManyRed   = Color(hex: "#D06B62") ?? .red     // 4+ missed
 
     /// Colour for a day's cell under the chosen scheme.
     ///
@@ -61,11 +62,10 @@ public enum Theme {
             return cellColor(level: day.level, accent: accent)
 
         case .informative:
-            let calendar = Calendar.current
-            let isFuture = calendar.startOfDay(for: day.date) > calendar.startOfDay(for: AppClock.now)
-            if day.scheduled == 0 || isFuture { return emptyCell.opacity(0.5) }
+            // Nothing assessed that day (no habits due, or a future day) → neutral, never red.
+            guard day.scheduled > 0 else { return emptyCell.opacity(0.5) }
 
-            switch max(0, day.scheduled - day.count) {
+            switch day.missed {
             case 0: return missNoneGreen
             case 1: return missOneGreen
             case 2...3: return missFewYellow
