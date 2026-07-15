@@ -30,6 +30,7 @@ struct HomeView: View {
     @State private var selectedDay: Date?
     @State private var isEditing = false
     @State private var draggingHabit: Habit?
+    @State private var detailHabit: Habit?
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
@@ -94,6 +95,9 @@ struct HomeView: View {
             }
             .sheet(item: $editing) { habit in
                 HabitEditView(habit: habit)
+            }
+            .sheet(item: $detailHabit) { habit in
+                HabitDetailView(habit: habit)
             }
         }
     }
@@ -513,35 +517,42 @@ struct HomeView: View {
         }
     }
 
-    /// A checkable habit row (today's habits) with an edit/delete context menu.
+    /// A checkable habit row (today's habits). Tapping the name opens progress; the circle toggles.
     private func checkableRow(_ habit: Habit) -> some View {
-        HabitRow(habit: habit, accent: accent, now: AppClock.now) {
+        HabitRow(habit: habit, accent: accent, now: AppClock.now, openDetail: {
+            detailHabit = habit
+        }, toggle: {
             let nowDone = withAnimation(.snappy) {
                 HabitActions.toggleCompletion(for: habit, in: context)
             }
             if nowDone { SoundEffects.playCheck() }
-        }
+        })
         .contextMenu { editDeleteMenu(habit) }
     }
 
-    /// A non-checkable row for habits not due today: shows the next occurrence; edit/delete via menu.
+    /// A non-checkable row for habits not due today: shows the next occurrence. Tap opens progress.
     private func infoRow(_ habit: Habit) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: habit.iconName)
-                .font(.title3)
-                .foregroundStyle(Color(hex: habit.colorHex) ?? accent)
-                .frame(width: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(habit.name.isEmpty ? "Untitled" : habit.name)
-                    .foregroundStyle(.primary)
-                Text(nextText(habit))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        Button {
+            detailHabit = habit
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: habit.iconName)
+                    .font(.title3)
+                    .foregroundStyle(Color(hex: habit.colorHex) ?? accent)
+                    .frame(width: 30)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(habit.name.isEmpty ? "Untitled" : habit.name)
+                        .foregroundStyle(.primary)
+                    Text(nextText(habit))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
             }
-            Spacer()
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
         .contextMenu { editDeleteMenu(habit) }
     }
 
@@ -597,45 +608,53 @@ struct HomeView: View {
     }
 }
 
-/// A single habit row with an inline toggle: tapping checks the habit off for today, and
-/// tapping it again un-checks it.
+/// A single habit row: tapping the name/icon opens the habit's progress, while the circle on
+/// the right checks it off for today (tap again to un-check).
 struct HabitRow: View {
     let habit: Habit
     let accent: Color
     /// The app's current date (from AppClock) — passed in so the row refreshes under Tester Mode.
     let now: Date
+    let openDetail: () -> Void
     let toggle: () -> Void
 
     private var habitColor: Color { Color(hex: habit.colorHex) ?? accent }
     private var done: Bool { habit.isCompleted(on: now) }
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: 12) {
-                Image(systemName: habit.iconName)
-                    .font(.title3)
-                    .foregroundStyle(habitColor)
-                    .frame(width: 30)
+        HStack(spacing: 12) {
+            Button(action: openDetail) {
+                HStack(spacing: 12) {
+                    Image(systemName: habit.iconName)
+                        .font(.title3)
+                        .foregroundStyle(habitColor)
+                        .frame(width: 30)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(habit.name.isEmpty ? "Untitled" : habit.name)
-                        .foregroundStyle(.primary)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(habit.name.isEmpty ? "Untitled" : habit.name)
+                            .foregroundStyle(.primary)
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
                 }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("View progress")
 
-                Spacer()
-
+            Button(action: toggle) {
                 Image(systemName: done ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
                     .foregroundStyle(done ? habitColor : Color.secondary.opacity(0.6))
                     .contentTransition(.symbolEffect(.replace))
             }
-            .contentShape(Rectangle())
-            .padding(.vertical, 4)
+            .buttonStyle(.plain)
+            .help(done ? "Mark not done" : "Mark done")
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 4)
     }
 
     private var subtitle: String {

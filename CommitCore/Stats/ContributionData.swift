@@ -341,4 +341,125 @@ public extension Habit {
         }
         return streak
     }
+
+    /// Total number of days this habit was ever completed.
+    var totalCompletions: Int { completedDaySet().count }
+
+    /// The longest run this habit ever sustained, using the same rules as `currentStreak`
+    /// (consecutive scheduled days for date-based habits, consecutive on-target weeks/months
+    /// for times-per-week / month habits) but scanning the whole history for the maximum.
+    func longestStreak(asOf date: Date = AppClock.now, calendar: Calendar = .current) -> Int {
+        let completed = completedDaySet(calendar: calendar)
+        let today = calendar.startOfDay(for: date)
+        let start = calendar.startOfDay(for: createdAt)
+        guard start <= today else { return 0 }
+
+        if case .timesPerWeek(let target) = schedule {
+            return longestPeriodStreak(target: target, weekly: true, completed: completed, start: start, today: today, calendar: calendar)
+        }
+        if case .timesPerMonth(let target) = schedule {
+            return longestPeriodStreak(target: target, weekly: false, completed: completed, start: start, today: today, calendar: calendar)
+        }
+
+        var maxRun = 0, run = 0, safety = 0
+        var day = start
+        while day <= today && safety < 4000 {
+            safety += 1
+            if schedule.isScheduled(on: day, calendar: calendar) {
+                if completed.contains(day) {
+                    run += 1
+                    maxRun = max(maxRun, run)
+                } else if calendar.isDateInToday(day) {
+                    // Today not done yet — don't reset the run.
+                } else {
+                    run = 0
+                }
+            }
+            day = calendar.date(byAdding: .day, value: 1, to: day) ?? today.addingTimeInterval(86_400)
+        }
+        return maxRun
+    }
+
+    /// How well the habit has been kept, 0…1: scheduled days completed ÷ scheduled days for
+    /// date-based habits, or on-target periods ÷ elapsed periods for times-per-week / month.
+    /// The current in-progress day/period is excluded so it isn't unfairly counted as a miss.
+    func completionRate(asOf date: Date = AppClock.now, calendar: Calendar = .current) -> Double {
+        let completed = completedDaySet(calendar: calendar)
+        let today = calendar.startOfDay(for: date)
+        let start = calendar.startOfDay(for: createdAt)
+        guard start <= today else { return 0 }
+
+        if case .timesPerWeek(let target) = schedule {
+            return periodRate(target: target, weekly: true, completed: completed, start: start, today: today, calendar: calendar)
+        }
+        if case .timesPerMonth(let target) = schedule {
+            return periodRate(target: target, weekly: false, completed: completed, start: start, today: today, calendar: calendar)
+        }
+
+        var scheduledDays = 0, doneDays = 0, safety = 0
+        var day = start
+        while day <= today && safety < 4000 {
+            safety += 1
+            if schedule.isScheduled(on: day, calendar: calendar) {
+                let doneToday = completed.contains(day)
+                // Skip an in-progress today that isn't done yet.
+                if !(calendar.isDateInToday(day) && !doneToday) {
+                    scheduledDays += 1
+                    if doneToday { doneDays += 1 }
+                }
+            }
+            day = calendar.date(byAdding: .day, value: 1, to: day) ?? today.addingTimeInterval(86_400)
+        }
+        return scheduledDays > 0 ? Double(doneDays) / Double(scheduledDays) : 0
+    }
+
+    // MARK: Period-habit helpers (weeks / months)
+
+    private func periodBounds(start: Date, weekly: Bool, calendar: Calendar) -> (start: Date, end: Date) {
+        if weekly {
+            let s = calendar.startOfWeek(for: start)
+            return (s, calendar.endOfWeek(for: s))
+        }
+        let s = calendar.date(from: calendar.dateComponents([.year, .month], from: start)) ?? start
+        let count = calendar.range(of: .day, in: .month, for: s)?.count ?? 30
+        return (s, calendar.date(byAdding: .day, value: count - 1, to: s) ?? s)
+    }
+
+    private func longestPeriodStreak(target: Int, weekly: Bool, completed: Set<Date>, start: Date, today: Date, calendar: Calendar) -> Int {
+        var maxRun = 0, run = 0, safety = 0
+        var periodStart = periodBounds(start: start, weekly: weekly, calendar: calendar).start
+        while periodStart <= today && safety < 2400 {
+            safety += 1
+            let bounds = periodBounds(start: periodStart, weekly: weekly, calendar: calendar)
+            let count = completed.filter { $0 >= bounds.start && $0 <= bounds.end }.count
+            let isCurrent = today >= bounds.start && today <= bounds.end
+            if count >= target {
+                run += 1
+                maxRun = max(maxRun, run)
+            } else if isCurrent {
+                // In-progress period — don't reset.
+            } else {
+                run = 0
+            }
+            periodStart = calendar.date(byAdding: weekly ? .weekOfYear : .month, value: 1, to: periodStart) ?? today.addingTimeInterval(86_400)
+        }
+        return maxRun
+    }
+
+    private func periodRate(target: Int, weekly: Bool, completed: Set<Date>, start: Date, today: Date, calendar: Calendar) -> Double {
+        var total = 0, met = 0, safety = 0
+        var periodStart = periodBounds(start: start, weekly: weekly, calendar: calendar).start
+        while periodStart <= today && safety < 2400 {
+            safety += 1
+            let bounds = periodBounds(start: periodStart, weekly: weekly, calendar: calendar)
+            let isCurrent = today >= bounds.start && today <= bounds.end
+            if !isCurrent {   // only score fully-elapsed periods
+                total += 1
+                let count = completed.filter { $0 >= bounds.start && $0 <= bounds.end }.count
+                if count >= target { met += 1 }
+            }
+            periodStart = calendar.date(byAdding: weekly ? .weekOfYear : .month, value: 1, to: periodStart) ?? today.addingTimeInterval(86_400)
+        }
+        return total > 0 ? Double(met) / Double(total) : 0
+    }
 }
