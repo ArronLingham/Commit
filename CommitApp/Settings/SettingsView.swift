@@ -7,7 +7,6 @@ struct SettingsView: View {
 
     @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
     private var accentHex = Theme.defaultAccentHex
-    private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
 
     @AppStorage(ReminderScheduler.enabledKey, store: CommitConstants.sharedDefaults)
     private var reminderEnabled = false
@@ -26,11 +25,15 @@ struct SettingsView: View {
 
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
+    @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
+    private var informativePaletteRaw = InformativePalette.soft.rawValue
+    private var informativePalette: InformativePalette {
+        InformativePalette(rawValue: informativePaletteRaw) ?? .soft
+    }
 
     var body: some View {
         Form {
-            accentSection
-            graphColorSection
+            appearanceSection
             reminderSection
             layoutSection
             menuBarSection
@@ -156,42 +159,72 @@ struct SettingsView: View {
         AppClock.overrideDate = date
     }
 
-    // MARK: Graph colours
+    // MARK: Appearance
 
-    private var graphColorSection: some View {
+    private var appearanceSection: some View {
         Section {
-            Picker("Colour scheme", selection: $colorScheme) {
+            Picker("Style", selection: $colorScheme) {
                 ForEach(GraphColorScheme.allCases) { scheme in
                     Text(scheme.label).tag(scheme)
                 }
             }
-            ContributionLegend(accent: accent, cellSize: 14, scheme: colorScheme)
-                .padding(.vertical, 2)
+            if colorScheme == .githubGreen {
+                accentSwatches
+            } else {
+                paletteChoices
+            }
         } header: {
-            Text("Graph colours")
+            Text("Appearance")
         } footer: {
-            Text("GitHub green shades every day by how much you completed. Green · yellow · red is blunter: a day is green if you finished it, and turns yellow then red the more habits you missed.")
+            Text(colorScheme == .githubGreen
+                 ? "GitHub style shades each day by how much you completed, in the accent colour you pick."
+                 : "Green · yellow · red colours each day by how many habits you missed. Pick a palette style for the graph.")
         }
     }
 
-    // MARK: Accent
+    /// GitHub-style: pick the single accent hue used across the app and the green graph.
+    private var accentSwatches: some View {
+        HStack(spacing: 12) {
+            ForEach(Theme.presetAccents, id: \.self) { hex in
+                Circle()
+                    .fill(Color(hex: hex) ?? .gray)
+                    .frame(width: 28, height: 28)
+                    .overlay(Circle().strokeBorder(.primary, lineWidth: accentHex == hex ? 2.5 : 0))
+                    .onTapGesture {
+                        accentHex = hex
+                        Theme.setAccent(hex: hex)
+                    }
+            }
+        }
+        .padding(.vertical, 4)
+    }
 
-    private var accentSection: some View {
-        Section("Accent") {
+    /// Informative scheme: pick a shade/style of the green·yellow·red palette.
+    private var paletteChoices: some View {
+        ForEach(InformativePalette.allCases) { palette in
+            let selected = palette == informativePalette
             HStack(spacing: 12) {
-                ForEach(Theme.presetAccents, id: \.self) { hex in
-                    Circle()
-                        .fill(Color(hex: hex) ?? .gray)
-                        .frame(width: 28, height: 28)
-                        .overlay(Circle().strokeBorder(.primary, lineWidth: accentHex == hex ? 2.5 : 0))
-                        .onTapGesture {
-                            accentHex = hex
-                            Theme.setAccent(hex: hex)
-                        }
+                let colors = palette.colors
+                HStack(spacing: 4) {
+                    ForEach([colors.none, colors.one, colors.few, colors.many], id: \.self) { swatch in
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(swatch)
+                            .frame(width: 18, height: 18)
+                    }
+                }
+                Text(palette.label)
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark").foregroundStyle(.tint)
                 }
             }
-            .padding(.vertical, 4)
-            ContributionLegend(accent: accent, cellSize: 14)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                informativePaletteRaw = palette.rawValue
+                // Keep the app's accent (checkmarks, buttons) coherent with the green graph.
+                accentHex = palette.allDoneHex
+                Theme.setAccent(hex: palette.allDoneHex)
+            }
         }
     }
 

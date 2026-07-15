@@ -41,19 +41,18 @@ public enum Theme {
 
     // MARK: Graph colour scheme
 
-    /// Semantic colours for the "informative" (green → yellow → red) scheme. Muted "Soft" set —
-    /// for a richer look swap in the "Deep" values: #2E7D46 / #6BA368 / #C99A3B / #B4453F.
-    public static let missNoneGreen = Color(hex: "#4CAF6E") ?? .green   // 0 missed
-    public static let missOneGreen  = Color(hex: "#8BC28A") ?? .green   // 1 missed
-    public static let missFewYellow = Color(hex: "#E0B152") ?? .yellow  // 2–3 missed
-    public static let missManyRed   = Color(hex: "#D06B62") ?? .red     // 4+ missed
+    /// The currently selected informative palette variant, from shared defaults (default `.soft`).
+    public static func informativePalette() -> InformativePalette {
+        let raw = CommitConstants.sharedDefaults.string(forKey: InformativePalette.storageKey) ?? ""
+        return InformativePalette(rawValue: raw) ?? .soft
+    }
 
     /// Colour for a day's cell under the chosen scheme.
     ///
     /// - `.githubGreen`: intensity by how much of the day was completed, all in the accent hue.
     /// - `.informative`: blunt read by how many scheduled habits were **missed** that day —
-    ///   0 → brightest green, 1 → a step-down green, 2–3 → yellow, 4+ → red. Days with nothing
-    ///   scheduled, and days still in the future, stay neutral so they're never painted red.
+    ///   0 → brightest green, 1 → a step-down green, 2–3 → yellow, 4+ → red, using the selected
+    ///   palette variant. Days with nothing scheduled, and future days, stay neutral.
     public static func cellColor(day: DayContribution, scheme: GraphColorScheme, accent: Color) -> Color {
         guard day.isInRange else { return emptyCell.opacity(0.25) }
 
@@ -65,11 +64,12 @@ public enum Theme {
             // Nothing assessed that day (no habits due, or a future day) → neutral, never red.
             guard day.scheduled > 0 else { return emptyCell.opacity(0.5) }
 
+            let colors = informativePalette().colors
             switch day.missed {
-            case 0: return missNoneGreen
-            case 1: return missOneGreen
-            case 2...3: return missFewYellow
-            default: return missManyRed
+            case 0: return colors.none
+            case 1: return colors.one
+            case 2...3: return colors.few
+            default: return colors.many
             }
         }
     }
@@ -97,12 +97,49 @@ public enum GraphColorScheme: String, CaseIterable, Identifiable, Sendable {
 
     public var label: String {
         switch self {
-        case .githubGreen: return "GitHub green"
+        case .githubGreen: return "GitHub style"
         case .informative: return "Green · yellow · red"
         }
     }
 
     public static let storageKey = "graphColorScheme"
+}
+
+/// A shade/style variant for the informative (green·yellow·red) scheme. User-selectable in
+/// Settings when that scheme is active.
+public enum InformativePalette: String, CaseIterable, Identifiable, Sendable {
+    case soft, deep, vivid
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .soft: return "Soft"
+        case .deep: return "Deep"
+        case .vivid: return "Vivid"
+        }
+    }
+
+    /// Hex for the "all done" green — also used as the app accent when this palette is chosen.
+    public var allDoneHex: String {
+        switch self {
+        case .soft: return "#4CAF6E"
+        case .deep: return "#2E7D46"
+        case .vivid: return "#2FB457"
+        }
+    }
+
+    /// The four cell colours: none (all done) → one → few (2–3) → many (4+ missed).
+    public var colors: (none: Color, one: Color, few: Color, many: Color) {
+        func c(_ hex: String) -> Color { Color(hex: hex) ?? .gray }
+        switch self {
+        case .soft: return (c("#4CAF6E"), c("#8BC28A"), c("#E0B152"), c("#D06B62"))
+        case .deep: return (c("#2E7D46"), c("#5C9A5E"), c("#C99A3B"), c("#B4453F"))
+        case .vivid: return (c("#2FB457"), c("#7DCB6B"), c("#F2C14E"), c("#EF5350"))
+        }
+    }
+
+    public static let storageKey = "informativePalette"
 }
 
 public extension Color {

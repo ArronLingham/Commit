@@ -36,6 +36,9 @@ struct HomeView: View {
     private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
+    // Observed only so the graph re-renders when the informative palette variant changes.
+    @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
+    private var informativePaletteRaw = InformativePalette.soft.rawValue
     // Observed only so the page re-renders when Tester Mode changes the simulated date.
     @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
     private var testerEnabled = false
@@ -100,7 +103,6 @@ struct HomeView: View {
     private var graphSection: some View {
         VStack(spacing: 12) {
             graph
-            ContributionLegend(accent: accent, scheme: colorScheme)
             // Updates as you hover a cell (also shown as a native tooltip via .help).
             Text(hoveredDay?.summary ?? " ")
                 .font(.caption)
