@@ -50,10 +50,17 @@ public enum Theme {
     /// Colour for a day's cell under the chosen scheme.
     ///
     /// - `.githubGreen`: intensity by how much of the day was completed, all in the accent hue.
-    /// - `.informative`: blunt read by how many scheduled habits were **missed** that day —
-    ///   0 → brightest green, 1 → a step-down green, 2–3 → yellow, 4+ → red, using the selected
-    ///   palette variant. Days with nothing scheduled, and future days, stay neutral.
-    public static func cellColor(day: DayContribution, scheme: GraphColorScheme, accent: Color) -> Color {
+    /// - `.informative` (aggregate): read by how many scheduled habits were **missed** that day —
+    ///   0 → brightest green, 1 → step-down green, 2–3 → yellow, 4+ → red (selected palette). Days
+    ///   with nothing scheduled, and future days, stay neutral.
+    /// - `.informative` with `singleHabit`: one habit can only be done or missed, so it's binary —
+    ///   done → green, missed → red — with today-not-yet-done left neutral.
+    public static func cellColor(
+        day: DayContribution,
+        scheme: GraphColorScheme,
+        accent: Color,
+        singleHabit: Bool = false
+    ) -> Color {
         guard day.isInRange else { return emptyCell.opacity(0.25) }
 
         switch scheme {
@@ -65,6 +72,15 @@ public enum Theme {
             guard day.scheduled > 0 else { return emptyCell.opacity(0.5) }
 
             let colors = informativePalette().colors
+
+            if singleHabit {
+                // Don't flag an in-progress today red before it's had a chance to be done.
+                if day.missed > 0 && Calendar.current.isDate(day.date, inSameDayAs: AppClock.now) {
+                    return emptyCell.opacity(0.5)
+                }
+                return day.missed == 0 ? colors.none : colors.many
+            }
+
             switch day.missed {
             case 0: return colors.none
             case 1: return colors.one

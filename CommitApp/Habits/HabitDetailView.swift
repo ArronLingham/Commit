@@ -33,28 +33,27 @@ struct HabitDetailView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    Picker("Span", selection: $span) {
-                        ForEach(Span.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    graph
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    statsGrid
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                Picker("Span", selection: $span) {
+                    ForEach(Span.allCases) { Text($0.rawValue).tag($0) }
                 }
-                .padding(20)
+                .pickerStyle(.segmented)
+                graph
+                    .frame(maxWidth: .infinity, alignment: .center)
+                statsGrid
             }
-            .navigationTitle("Progress")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
+            .padding(20)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+        }
+        .navigationTitle("Progress")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
             }
         }
-        .frame(minWidth: 480, minHeight: 560)
     }
 
     // MARK: Header
@@ -98,7 +97,7 @@ struct HabitDetailView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Theme.cellColor(day: day, scheme: colorScheme, accent: accent))
+                        .fill(Theme.cellColor(day: day, scheme: colorScheme, accent: accent, singleHabit: true))
                         .frame(width: 34, height: 34)
                         .help(day.summary)
                 }
@@ -113,7 +112,8 @@ struct HabitDetailView: View {
             spacing: 4,
             accent: accent,
             scheme: colorScheme,
-            showMonthLabels: false
+            showMonthLabels: false,
+            singleHabit: true
         )
     }
 
@@ -128,7 +128,8 @@ struct HabitDetailView: View {
             spacing: spacing,
             accent: accent,
             scheme: colorScheme,
-            showMonthLabels: true
+            showMonthLabels: true,
+            singleHabit: true
         )
     }
 

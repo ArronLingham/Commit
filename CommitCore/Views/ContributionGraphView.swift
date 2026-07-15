@@ -19,6 +19,9 @@ public struct ContributionGraphView: View {
     public var selectedDate: Date?
     /// Optional tap callback: the day the user clicked.
     public var onSelectDay: ((DayContribution) -> Void)?
+    /// When true, the informative scheme colours a day green (done) or red (missed) rather than
+    /// by miss-count buckets — used for a single habit's own graph.
+    public var singleHabit: Bool
 
     public init(
         days: [DayContribution],
@@ -30,7 +33,8 @@ public struct ContributionGraphView: View {
         excludeCurrentMonthLabel: Bool = false,
         onHoverDay: ((DayContribution?) -> Void)? = nil,
         selectedDate: Date? = nil,
-        onSelectDay: ((DayContribution) -> Void)? = nil
+        onSelectDay: ((DayContribution) -> Void)? = nil,
+        singleHabit: Bool = false
     ) {
         self.days = days
         self.cellSize = cellSize
@@ -42,6 +46,7 @@ public struct ContributionGraphView: View {
         self.onHoverDay = onHoverDay
         self.selectedDate = selectedDate
         self.onSelectDay = onSelectDay
+        self.singleHabit = singleHabit
     }
 
     /// Days grouped into week columns (each column is 7 days, top = first weekday).
@@ -91,7 +96,7 @@ public struct ContributionGraphView: View {
     }
 
     private func color(for day: DayContribution) -> Color {
-        Theme.cellColor(day: day, scheme: scheme, accent: accent)
+        Theme.cellColor(day: day, scheme: scheme, accent: accent, singleHabit: singleHabit)
     }
 
     private func isSelected(_ day: DayContribution) -> Bool {

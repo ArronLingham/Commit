@@ -96,8 +96,13 @@ struct HomeView: View {
             .sheet(item: $editing) { habit in
                 HabitEditView(habit: habit)
             }
-            .sheet(item: $detailHabit) { habit in
-                HabitDetailView(habit: habit)
+            .navigationDestination(isPresented: Binding(
+                get: { detailHabit != nil },
+                set: { if !$0 { detailHabit = nil } }
+            )) {
+                if let habit = detailHabit {
+                    HabitDetailView(habit: habit)
+                }
             }
         }
     }
