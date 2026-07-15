@@ -189,6 +189,10 @@ private func assess(
     var scheduled = 0
     var missed = 0
     for habit in habits {
+        // A habit only applies from the day it was created onward (inclusive) — earlier days
+        // are neutral, not misses.
+        guard day >= calendar.startOfDay(for: habit.createdAt) else { continue }
+
         switch habit.schedule {
         case .timesPerWeek(let n):
             guard calendar.isDate(day, inSameDayAs: calendar.endOfWeek(for: day)) else { continue }

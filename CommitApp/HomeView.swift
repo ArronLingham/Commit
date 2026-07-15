@@ -255,9 +255,14 @@ struct HomeView: View {
 
     // MARK: Day detail
 
-    /// The habits scheduled on `date`, in the same order as the main list.
+    /// The habits scheduled on `date`, in the same order as the main list. Excludes habits that
+    /// didn't exist yet on that day, so past days can't be checked off before a habit was added.
     private func habitsScheduled(on date: Date) -> [Habit] {
-        habits.filter { $0.schedule.isScheduled(on: date) }
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: date)
+        return habits.filter {
+            calendar.startOfDay(for: $0.createdAt) <= day && $0.schedule.isScheduled(on: date)
+        }
     }
 
     /// Inline card shown under the graph when a day is selected: that day's habits with a
