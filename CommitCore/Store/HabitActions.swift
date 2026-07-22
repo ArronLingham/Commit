@@ -92,6 +92,24 @@ public enum HabitActions {
         try? context.save()
     }
 
+    /// Pause (snooze) a habit until `until` (start of that day) — it hides from the Today list and
+    /// its paused days don't count as missed. Auto-resumes once the date passes.
+    public static func pause(_ habit: Habit, until: Date, in context: ModelContext) {
+        let calendar = Calendar.current
+        habit.pausedFrom = calendar.startOfDay(for: AppClock.now)
+        habit.pausedUntil = calendar.startOfDay(for: until)
+        habit.updatedAt = Date()
+        try? context.save()
+    }
+
+    /// End a pause now. Keeps `[pausedFrom, today)` as the elapsed paused span so that stretch of
+    /// history stays neutral, while today becomes active again.
+    public static func resume(_ habit: Habit, in context: ModelContext) {
+        habit.pausedUntil = Calendar.current.startOfDay(for: AppClock.now)
+        habit.updatedAt = Date()
+        try? context.save()
+    }
+
     /// Persist a new ordering: rewrite each habit's `sortOrder` to its index in `ordered`.
     public static func reorder(_ ordered: [Habit], in context: ModelContext) {
         for (index, habit) in ordered.enumerated() where habit.sortOrder != index {

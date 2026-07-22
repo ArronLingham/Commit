@@ -70,6 +70,11 @@ struct HabitDetailView: View {
                 Text(habit.schedule.shortDescription())
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if let paused = habit.pauseStatusText() {
+                    Label(paused, systemImage: "pause.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
         }

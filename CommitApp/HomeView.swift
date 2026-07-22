@@ -31,6 +31,7 @@ struct HomeView: View {
     @State private var isEditing = false
     @State private var draggingHabit: Habit?
     @State private var detailHabit: Habit?
+    @State private var pausingHabit: Habit?
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
@@ -52,13 +53,19 @@ struct HomeView: View {
 
     private var todaysHabits: [Habit] {
         // Hide times-per-week / month habits once the target is met — but not on the day you
-        // checked off the last one (see Habit.isDueForList).
-        habits.filter { $0.isDueForList() }
+        // checked off the last one (see Habit.isDueForList). Paused habits are hidden too.
+        habits.filter { !$0.isPaused() && $0.isDueForList() }
     }
 
     private var upcomingHabits: [Habit] {
-        habits.filter { !$0.schedule.isScheduled(on: AppClock.now) }
+        habits.filter { !$0.isPaused() && !$0.schedule.isScheduled(on: AppClock.now) }
             .sorted { ($0.schedule.nextDate() ?? .distantFuture) < ($1.schedule.nextDate() ?? .distantFuture) }
+    }
+
+    /// Habits currently snoozed — shown only in the collapsed "Paused" section.
+    private var pausedHabits: [Habit] {
+        habits.filter { $0.isPaused() }
+            .sorted { ($0.pausedUntil ?? .distantFuture) < ($1.pausedUntil ?? .distantFuture) }
     }
 
     private var contributions: Contributions {
@@ -95,6 +102,9 @@ struct HomeView: View {
             }
             .sheet(item: $editing) { habit in
                 HabitEditView(habit: habit)
+            }
+            .sheet(item: $pausingHabit) { habit in
+                PauseSheet(habit: habit)
             }
             .navigationDestination(isPresented: Binding(
                 get: { detailHabit != nil },
@@ -261,7 +271,9 @@ struct HomeView: View {
         let calendar = Calendar.current
         let day = calendar.startOfDay(for: date)
         return habits.filter {
-            calendar.startOfDay(for: $0.createdAt) <= day && $0.schedule.isScheduled(on: date)
+            calendar.startOfDay(for: $0.createdAt) <= day
+                && !$0.isPausedDay(date, calendar: calendar)
+                && $0.schedule.isScheduled(on: date)
         }
     }
 
@@ -400,6 +412,54 @@ struct HomeView: View {
                 }
             }
         }
+        pausedSection
+    }
+
+    /// Collapsed section listing snoozed habits so they're always findable and resumable.
+    @ViewBuilder
+    private var pausedSection: some View {
+        if !pausedHabits.isEmpty {
+            DisclosureGroup("Paused (\(pausedHabits.count))") {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(pausedHabits) { pausedRow($0) }
+                }
+            }
+        }
+    }
+
+    /// A snoozed habit row: dimmed, showing when it resumes, with a Resume button.
+    private func pausedRow(_ habit: Habit) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                detailHabit = habit
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: habit.iconName)
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(habit.name.isEmpty ? "Untitled" : habit.name)
+                            .foregroundStyle(.primary)
+                        Text(habit.pauseStatusText() ?? "Paused")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button("Resume") {
+                withAnimation(.snappy) { HabitActions.resume(habit, in: context) }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.vertical, 4)
+        .opacity(0.7)
+        .contextMenu { editDeleteMenu(habit) }
     }
 
     // MARK: Edit mode
@@ -509,7 +569,9 @@ struct HomeView: View {
             )
         } else {
             ForEach(habits) { habit in
-                if habit.schedule.isScheduled(on: AppClock.now) {
+                if habit.isPaused() {
+                    EmptyView()   // shown in the Paused section instead
+                } else if habit.schedule.isScheduled(on: AppClock.now) {
                     checkableRow(habit)
                 } else {
                     infoRow(habit)
@@ -569,9 +631,30 @@ struct HomeView: View {
     @ViewBuilder
     private func editDeleteMenu(_ habit: Habit) -> some View {
         Button("Edit…") { editing = habit }
+        if habit.isPaused() {
+            Button("Resume") {
+                withAnimation(.snappy) { HabitActions.resume(habit, in: context) }
+            }
+        } else {
+            Menu("Pause") {
+                Button("For 1 day") { pause(habit, days: 1) }
+                Button("For 3 days") { pause(habit, days: 3) }
+                Button("For 1 week") { pause(habit, days: 7) }
+                Button("Until a date…") { pausingHabit = habit }
+            }
+        }
+        Divider()
         Button("Delete", role: .destructive) {
             HabitActions.softDelete(habit, in: context)
         }
+    }
+
+    /// Pause a habit for `days` starting today (resumes on the day after the window).
+    private func pause(_ habit: Habit, days: Int) {
+        let until = Calendar.current.date(
+            byAdding: .day, value: days, to: Calendar.current.startOfDay(for: AppClock.now)
+        ) ?? AppClock.now
+        withAnimation(.snappy) { HabitActions.pause(habit, until: until, in: context) }
     }
 
     /// "Next: Sunday · Jun 29" — the habit's next scheduled day, weekday + date.

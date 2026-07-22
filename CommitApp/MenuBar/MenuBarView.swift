@@ -30,8 +30,8 @@ struct MenuBarView: View {
 
     private var todaysHabits: [Habit] {
         // Hide times-per-week / month habits once the target is met — but not on the day you
-        // checked off the last one (see Habit.isDueForList).
-        habits.filter { $0.isDueForList() }
+        // checked off the last one (see Habit.isDueForList). Paused habits are hidden too.
+        habits.filter { !$0.isPaused() && $0.isDueForList() }
     }
     private var completedToday: Int {
         todaysHabits.filter { $0.isCompleted(on: AppClock.now) }.count

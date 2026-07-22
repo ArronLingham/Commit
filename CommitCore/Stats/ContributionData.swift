@@ -192,6 +192,8 @@ private func assess(
         // A habit only applies from the day it was created onward (inclusive) — earlier days
         // are neutral, not misses.
         guard day >= calendar.startOfDay(for: habit.createdAt) else { continue }
+        // Paused days are neutral too — a snooze isn't a miss.
+        guard !habit.isPausedDay(day, calendar: calendar) else { continue }
 
         switch habit.schedule {
         case .timesPerWeek(let n):
@@ -273,6 +275,28 @@ public extension Habit {
         return true
     }
 
+    // MARK: Pause / snooze
+
+    /// Whether the habit is currently paused (hidden from the Today list) as of `date`.
+    func isPaused(asOf date: Date = AppClock.now) -> Bool {
+        guard let from = pausedFrom, let until = pausedUntil else { return false }
+        return date >= from && date < until
+    }
+
+    /// Whether `day` falls inside the pause window — such days are neutral on the graph and don't
+    /// break streaks / lower the completion rate.
+    func isPausedDay(_ day: Date, calendar: Calendar = .current) -> Bool {
+        guard let from = pausedFrom, let until = pausedUntil else { return false }
+        let d = calendar.startOfDay(for: day)
+        return d >= calendar.startOfDay(for: from) && d < calendar.startOfDay(for: until)
+    }
+
+    /// A short "Paused until Jul 3" label, or nil when not paused.
+    func pauseStatusText(asOf date: Date = AppClock.now) -> String? {
+        guard isPaused(asOf: date), let until = pausedUntil else { return nil }
+        return "Paused until \(until.formatted(.dateTime.month(.abbreviated).day()))"
+    }
+
     /// Current streak.
     ///
     /// For daily / weekday habits this counts consecutive *scheduled* days completed,
@@ -332,7 +356,7 @@ public extension Habit {
         var safety = 0
         while safety < 3650 {
             safety += 1
-            if schedule.isScheduled(on: day, calendar: calendar) {
+            if schedule.isScheduled(on: day, calendar: calendar) && !isPausedDay(day, calendar: calendar) {
                 if completed.contains(day) {
                     streak += 1
                 } else if calendar.isDateInToday(day) {
@@ -369,7 +393,7 @@ public extension Habit {
         var day = start
         while day <= today && safety < 4000 {
             safety += 1
-            if schedule.isScheduled(on: day, calendar: calendar) {
+            if schedule.isScheduled(on: day, calendar: calendar) && !isPausedDay(day, calendar: calendar) {
                 if completed.contains(day) {
                     run += 1
                     maxRun = max(maxRun, run)
@@ -404,7 +428,7 @@ public extension Habit {
         var day = start
         while day <= today && safety < 4000 {
             safety += 1
-            if schedule.isScheduled(on: day, calendar: calendar) {
+            if schedule.isScheduled(on: day, calendar: calendar) && !isPausedDay(day, calendar: calendar) {
                 let doneToday = completed.contains(day)
                 // Skip an in-progress today that isn't done yet.
                 if !(calendar.isDateInToday(day) && !doneToday) {

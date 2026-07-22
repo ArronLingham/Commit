@@ -33,6 +33,11 @@ public final class Habit {
     /// Last local modification time; drives last-write-wins merge during sync.
     public var updatedAt: Date = Date()
 
+    /// Temporary pause window. When set, the habit is hidden from the Today list and not counted
+    /// as missed for days in `[pausedFrom, pausedUntil)`; it auto-resumes once `pausedUntil` passes.
+    public var pausedFrom: Date? = nil
+    public var pausedUntil: Date? = nil
+
     @Relationship(deleteRule: .cascade, inverse: \HabitCompletion.habit)
     public var completions: [HabitCompletion]? = []
 
@@ -52,6 +57,8 @@ public final class Habit {
         self.isArchived = false
         self.isDeleted = false
         self.updatedAt = Date()
+        self.pausedFrom = nil
+        self.pausedUntil = nil
         self.completions = []
 
         // Encode the schedule into the stored fields explicitly (avoids calling a
