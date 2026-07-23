@@ -23,6 +23,11 @@ struct SettingsView: View {
     private var testerModeEnabled = false
     @State private var testerDate = AppClock.overrideDate
 
+    @AppStorage(PhoneSyncService.enabledKey, store: CommitConstants.sharedDefaults)
+    private var phoneSyncEnabled = false
+    @ObservedObject private var phoneSync = PhoneSyncService.shared
+    @State private var showingPhoneSetup = false
+
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
     @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
@@ -37,11 +42,15 @@ struct SettingsView: View {
             reminderSection
             layoutSection
             menuBarSection
+            phoneSyncSection
             testerSection
             aboutSection
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
+        .sheet(isPresented: $showingPhoneSetup) {
+            PhoneSetupView(folderName: phoneSync.folderName)
+        }
         .onAppear {
             reminderTime = Calendar.current.date(
                 bySettingHour: ReminderScheduler.hour,
@@ -106,6 +115,33 @@ struct SettingsView: View {
             Text("Menu Bar")
         } footer: {
             Text("Hide the checkmark from the menu bar. You can still open Commit from the Dock or Applications.")
+        }
+    }
+
+    // MARK: iPhone sync
+
+    private var phoneSyncSection: some View {
+        Section {
+            Toggle("Sync with iPhone (iCloud)", isOn: $phoneSyncEnabled)
+                .onChange(of: phoneSyncEnabled) { _, on in
+                    if on { phoneSync.start() } else { phoneSync.stop() }
+                }
+            if phoneSyncEnabled {
+                HStack {
+                    Button("Choose iCloud Drive folder…") { phoneSync.chooseFolder() }
+                    Spacer()
+                    if let name = phoneSync.folderName {
+                        Label(name, systemImage: "folder")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
+                }
+                Button("Show iPhone setup…") { showingPhoneSetup = true }
+            }
+        } header: {
+            Text("iPhone Sync")
+        } footer: {
+            Text("Check habits off from your iPhone via a Shortcut and a shared iCloud Drive folder — no account needed. Your Mac must be running to apply changes.")
         }
     }
 

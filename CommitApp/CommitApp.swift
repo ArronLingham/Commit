@@ -11,6 +11,8 @@ struct CommitApp: App {
     init() {
         // Re-arm the daily reminder for returning users (no-op / no prompt if disabled).
         ReminderScheduler.refresh()
+        // Resume iPhone sync (watches the shared iCloud Drive folder) if the user enabled it.
+        MainActor.assumeIsolated { PhoneSyncService.shared.startIfEnabled() }
     }
 
     var body: some Scene {
