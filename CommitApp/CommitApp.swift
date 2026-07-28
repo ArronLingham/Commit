@@ -5,6 +5,7 @@ import CommitCore
 @main
 struct CommitApp: App {
     private let container = SharedModelContainer.shared
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage(showMenuBarIconKey, store: CommitConstants.sharedDefaults)
     private var showMenuBarIcon = true
 

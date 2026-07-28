@@ -1,5 +1,7 @@
 import SwiftUI
 import CommitCore
+import UserNotifications
+import AppKit
 
 /// Accent colour and about info.
 struct SettingsView: View {
@@ -11,6 +13,7 @@ struct SettingsView: View {
     @AppStorage(ReminderScheduler.enabledKey, store: CommitConstants.sharedDefaults)
     private var reminderEnabled = false
     @State private var reminderTime = Date()
+    @State private var notifStatus: UNAuthorizationStatus = .notDetermined
 
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
@@ -58,6 +61,17 @@ struct SettingsView: View {
                 second: 0,
                 of: Date()
             ) ?? Date()
+            refreshNotifStatus()
+        }
+    }
+
+    private func refreshNotifStatus() {
+        ReminderScheduler.checkAuthorization { notifStatus = $0 }
+    }
+
+    private func openNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
         }
     }
 
@@ -68,6 +82,7 @@ struct SettingsView: View {
             Toggle("Daily reminder", isOn: $reminderEnabled)
                 .onChange(of: reminderEnabled) { _, _ in
                     ReminderScheduler.refresh()
+                    refreshNotifStatus()
                 }
             if reminderEnabled {
                 DatePicker("Time", selection: $reminderTime, displayedComponents: .hourAndMinute)
@@ -77,11 +92,24 @@ struct SettingsView: View {
                         ReminderScheduler.minute = comps.minute ?? 0
                         ReminderScheduler.refresh()
                     }
+                Button("Send test notification") {
+                    ReminderScheduler.sendTest()
+                    refreshNotifStatus()
+                }
+                if notifStatus == .denied {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Notifications are turned off for Commit in System Settings.",
+                              systemImage: "bell.slash")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Open System Settings") { openNotificationSettings() }
+                    }
+                }
             }
         } header: {
             Text("Reminder")
         } footer: {
-            Text("A daily notification nudging you to check off your habits.")
+            Text("A daily notification nudging you to check off your habits. If nothing appears, use “Send test notification” to confirm delivery.")
         }
     }
 

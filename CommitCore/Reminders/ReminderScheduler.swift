@@ -58,4 +58,30 @@ public enum ReminderScheduler {
     private static func cancel() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
     }
+
+    // MARK: Diagnostics
+
+    /// Send a one-off notification a few seconds from now so the user can confirm delivery works
+    /// without waiting for the daily time. Requests permission first if needed.
+    public static func sendTest() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Commit"
+            content.body = "Test reminder — notifications are working."
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
+            let request = UNNotificationRequest(identifier: "commit.test", content: content, trigger: trigger)
+            center.add(request)
+        }
+    }
+
+    /// The current notification authorization status, delivered on the main queue — used by
+    /// Settings to warn when notifications are turned off for the app.
+    public static func checkAuthorization(_ completion: @escaping (UNAuthorizationStatus) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async { completion(settings.authorizationStatus) }
+        }
+    }
 }
