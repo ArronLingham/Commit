@@ -399,35 +399,24 @@ struct HomeView: View {
         switch otherHabitsStyle {
         case .upcoming:
             todaySectionView
-            if !upcomingHabits.isEmpty { upcomingSection }
+            if !upcomingHabits.isEmpty || !pausedHabits.isEmpty { upcomingSection }
         case .toggle:
             if scope == .today { todayRows } else { allHabitsRows }
         case .collapsible:
             todaySectionView
-            if !upcomingHabits.isEmpty {
-                DisclosureGroup("Other habits (\(upcomingHabits.count))") {
+            if !upcomingHabits.isEmpty || !pausedHabits.isEmpty {
+                DisclosureGroup("Other habits (\(upcomingHabits.count + pausedHabits.count))") {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(upcomingHabits) { infoRow($0) }
+                        ForEach(pausedHabits) { pausedRow($0) }
                     }
                 }
             }
         }
-        pausedSection
     }
 
-    /// Collapsed section listing snoozed habits so they're always findable and resumable.
-    @ViewBuilder
-    private var pausedSection: some View {
-        if !pausedHabits.isEmpty {
-            DisclosureGroup("Paused (\(pausedHabits.count))") {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(pausedHabits) { pausedRow($0) }
-                }
-            }
-        }
-    }
-
-    /// A snoozed habit row: dimmed, showing when it resumes, with a Resume button.
+    /// A snoozed habit row: greyed out in place, showing when it resumes, with a Resume button.
+    /// Never appears under Today — only in the All / Upcoming / Other lists.
     private func pausedRow(_ habit: Habit) -> some View {
         HStack(spacing: 12) {
             Button {
@@ -570,7 +559,7 @@ struct HomeView: View {
         } else {
             ForEach(habits) { habit in
                 if habit.isPaused() {
-                    EmptyView()   // shown in the Paused section instead
+                    pausedRow(habit)
                 } else if habit.schedule.isScheduled(on: AppClock.now) {
                     checkableRow(habit)
                 } else {
@@ -586,6 +575,7 @@ struct HomeView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
             ForEach(upcomingHabits) { infoRow($0) }
+            ForEach(pausedHabits) { pausedRow($0) }
         }
     }
 
