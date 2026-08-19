@@ -33,10 +33,18 @@ public final class Habit {
     /// Last local modification time; drives last-write-wins merge during sync.
     public var updatedAt: Date = Date()
 
-    /// Temporary pause window. When set, the habit is hidden from the Today list and not counted
+    /// The *latest* pause window. When set, the habit is hidden from the Today list and not counted
     /// as missed for days in `[pausedFrom, pausedUntil)`; it auto-resumes once `pausedUntil` passes.
     public var pausedFrom: Date? = nil
     public var pausedUntil: Date? = nil
+
+    /// Every *earlier* pause window, flattened to `[from, until, from, until, …]` — the same
+    /// primitive-fields trick `scheduleRaw` / `weekdays` use to stay CloudKit-friendly.
+    ///
+    /// Pausing overwrites `pausedFrom` / `pausedUntil`, so without this a second snooze would
+    /// erase the first and retroactively turn those neutral days into misses. Read/written as
+    /// `PauseSpan`s via `pauseHistory`.
+    public var pauseHistoryDates: [Date] = []
 
     @Relationship(deleteRule: .cascade, inverse: \HabitCompletion.habit)
     public var completions: [HabitCompletion]? = []
@@ -59,6 +67,7 @@ public final class Habit {
         self.updatedAt = Date()
         self.pausedFrom = nil
         self.pausedUntil = nil
+        self.pauseHistoryDates = []
         self.completions = []
 
         // Encode the schedule into the stored fields explicitly (avoids calling a
@@ -137,5 +146,64 @@ public extension Habit {
                 targetPerWeek = max(1, n)
             }
         }
+    }
+}
+
+// MARK: - Pause windows
+
+/// One pause window, half-open in start-of-day terms: `[from, until)`.
+public struct PauseSpan: Codable, Hashable, Sendable {
+    public var from: Date
+    public var until: Date
+
+    public init(from: Date, until: Date) {
+        self.from = from
+        self.until = until
+    }
+
+    /// A window that never covered a whole day — e.g. paused and resumed the same day.
+    public var isEmpty: Bool { until <= from }
+
+    public func contains(_ day: Date, calendar: Calendar = .current) -> Bool {
+        let d = calendar.startOfDay(for: day)
+        return d >= calendar.startOfDay(for: from) && d < calendar.startOfDay(for: until)
+    }
+
+    /// Sort and coalesce, dropping empty windows, so repeated snoozes can't pile up overlapping
+    /// spans. The result is the same set of paused days in the fewest windows.
+    public static func merged(_ spans: [PauseSpan]) -> [PauseSpan] {
+        let sorted = spans.filter { !$0.isEmpty }.sorted { $0.from < $1.from }
+        var result: [PauseSpan] = []
+        for span in sorted {
+            if var last = result.last, span.from <= last.until {
+                last.until = max(last.until, span.until)
+                result[result.count - 1] = last
+            } else {
+                result.append(span)
+            }
+        }
+        return result
+    }
+}
+
+public extension Habit {
+    /// The earlier pause windows held in `pauseHistoryDates`. An odd trailing date (which
+    /// shouldn't happen) is ignored rather than crashing.
+    var pauseHistory: [PauseSpan] {
+        get {
+            stride(from: 0, to: pauseHistoryDates.count - 1, by: 2).map {
+                PauseSpan(from: pauseHistoryDates[$0], until: pauseHistoryDates[$0 + 1])
+            }
+        }
+        set {
+            pauseHistoryDates = newValue.flatMap { [$0.from, $0.until] }
+        }
+    }
+
+    /// The window in `pausedFrom` / `pausedUntil`, or nil when it covers no days.
+    var currentPauseSpan: PauseSpan? {
+        guard let from = pausedFrom, let until = pausedUntil else { return nil }
+        let span = PauseSpan(from: from, until: until)
+        return span.isEmpty ? nil : span
     }
 }

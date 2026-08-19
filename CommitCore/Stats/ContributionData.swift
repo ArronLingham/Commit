@@ -283,12 +283,26 @@ public extension Habit {
         return date >= from && date < until
     }
 
-    /// Whether `day` falls inside the pause window — such days are neutral on the graph and don't
-    /// break streaks / lower the completion rate.
+    /// Whether `day` falls inside the current pause window **or any earlier one** — such days are
+    /// neutral on the graph and don't break streaks / lower the completion rate.
+    ///
+    /// Walks `pauseHistoryDates` in place rather than going through `pauseHistory`: this runs once
+    /// per habit per day inside the graph and streak loops, so it shouldn't allocate.
     func isPausedDay(_ day: Date, calendar: Calendar = .current) -> Bool {
-        guard let from = pausedFrom, let until = pausedUntil else { return false }
         let d = calendar.startOfDay(for: day)
-        return d >= calendar.startOfDay(for: from) && d < calendar.startOfDay(for: until)
+        if let from = pausedFrom, let until = pausedUntil,
+           d >= calendar.startOfDay(for: from), d < calendar.startOfDay(for: until) {
+            return true
+        }
+        var i = 0
+        while i + 1 < pauseHistoryDates.count {
+            if d >= calendar.startOfDay(for: pauseHistoryDates[i]),
+               d < calendar.startOfDay(for: pauseHistoryDates[i + 1]) {
+                return true
+            }
+            i += 2
+        }
+        return false
     }
 
     /// A short "Paused until Jul 3" label, or nil when not paused.

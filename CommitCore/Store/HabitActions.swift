@@ -96,14 +96,20 @@ public enum HabitActions {
     /// its paused days don't count as missed. Auto-resumes once the date passes.
     public static func pause(_ habit: Habit, until: Date, in context: ModelContext) {
         let calendar = Calendar.current
+        // Archive the window we're about to overwrite, so the days it covered stay neutral on the
+        // graph instead of flipping back to misses.
+        if let previous = habit.currentPauseSpan {
+            habit.pauseHistory = PauseSpan.merged(habit.pauseHistory + [previous])
+        }
         habit.pausedFrom = calendar.startOfDay(for: AppClock.now)
         habit.pausedUntil = calendar.startOfDay(for: until)
         habit.updatedAt = Date()
         try? context.save()
     }
 
-    /// End a pause now. Keeps `[pausedFrom, today)` as the elapsed paused span so that stretch of
-    /// history stays neutral, while today becomes active again.
+    /// End a pause now. Truncates the window to `[pausedFrom, today)`, so the days already spent
+    /// paused stay neutral while today counts again — resuming the same day you paused leaves an
+    /// empty window, which is intentional: the habit is back on your list for today.
     public static func resume(_ habit: Habit, in context: ModelContext) {
         habit.pausedUntil = Calendar.current.startOfDay(for: AppClock.now)
         habit.updatedAt = Date()
