@@ -22,6 +22,25 @@ struct HomeView: View {
         case today = "Today", all = "All"
         var id: String { rawValue }
     }
+    /// Sidebar destinations for the macOS (System Settings-style) layout.
+    enum MacSection: String, CaseIterable, Identifiable {
+        case today, all, paused
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .today:  return "Today"
+            case .all:    return "All Habits"
+            case .paused: return "Paused"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .today:  return "calendar"
+            case .all:    return "checklist"
+            case .paused: return "pause.circle"
+            }
+        }
+    }
     @State private var span: Span = .month
     @State private var scope: Scope = .today
     @State private var newHabitName = ""
@@ -32,6 +51,7 @@ struct HomeView: View {
     @State private var draggingHabit: Habit?
     @State private var detailHabit: Habit?
     @State private var pausingHabit: Habit?
+    @State private var macSection: MacSection = .today
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
     @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
@@ -41,6 +61,10 @@ struct HomeView: View {
     // Observed only so the graph re-renders when the informative palette variant changes.
     @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
     private var informativePaletteRaw = InformativePalette.soft.rawValue
+    // The overall window look — minimalist single page vs. macOS sidebar layout.
+    @AppStorage(AppearanceStyle.storageKey, store: CommitConstants.sharedDefaults)
+    private var appearanceRaw = AppearanceStyle.minimalist.rawValue
+    private var appearance: AppearanceStyle { AppearanceStyle(rawValue: appearanceRaw) ?? .minimalist }
     // Observed only so the page re-renders when Tester Mode changes the simulated date.
     @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
     private var testerEnabled = false
@@ -79,6 +103,15 @@ struct HomeView: View {
     }
 
     var body: some View {
+        switch appearance {
+        case .minimalist: minimalistBody
+        case .macOS:      macBody
+        }
+    }
+
+    // MARK: Minimalist layout (the original single page)
+
+    private var minimalistBody: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
@@ -92,27 +125,120 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)   // centre the content column
             }
             .navigationTitle("Commit")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Picker("Span", selection: $span) {
-                        ForEach(Span.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.menu)
+            .toolbar { spanToolbar }
+            .navigationDestination(isPresented: detailHabitBinding) {
+                if let habit = detailHabit { HabitDetailView(habit: habit) }
+            }
+        }
+        .sheet(item: $editing) { HabitEditView(habit: $0) }
+        .sheet(item: $pausingHabit) { PauseSheet(habit: $0) }
+    }
+
+    // MARK: macOS layout (System Settings-style sidebar)
+
+    private var macBody: some View {
+        NavigationSplitView {
+            List(selection: macSelectionBinding) {
+                ForEach(MacSection.allCases) { section in
+                    Label(section.title, systemImage: section.icon).tag(section)
                 }
             }
-            .sheet(item: $editing) { habit in
-                HabitEditView(habit: habit)
-            }
-            .sheet(item: $pausingHabit) { habit in
-                PauseSheet(habit: habit)
-            }
-            .navigationDestination(isPresented: Binding(
-                get: { detailHabit != nil },
-                set: { if !$0 { detailHabit = nil } }
-            )) {
-                if let habit = detailHabit {
-                    HabitDetailView(habit: habit)
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 212, max: 260)
+            .navigationTitle("Commit")
+        } detail: {
+            NavigationStack {
+                ScrollView {
+                    macDetail
+                        .padding(24)
+                        .frame(maxWidth: 720, alignment: .leading)
+                        .frame(maxWidth: .infinity)
                 }
+                .navigationTitle(macSection.title)
+                .toolbar {
+                    spanToolbar
+                    macEditToolbar
+                }
+                .navigationDestination(isPresented: detailHabitBinding) {
+                    if let habit = detailHabit { HabitDetailView(habit: habit) }
+                }
+            }
+        }
+        .sheet(item: $editing) { HabitEditView(habit: $0) }
+        .sheet(item: $pausingHabit) { PauseSheet(habit: $0) }
+    }
+
+    /// The detail pane for the macOS layout, driven by the sidebar selection. Reuses the same
+    /// graph, rows, and quick-add as the minimalist page — only the surrounding chrome differs.
+    @ViewBuilder
+    private var macDetail: some View {
+        switch macSection {
+        case .today:
+            VStack(alignment: .leading, spacing: 20) {
+                graphSection
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
+                    .surface(appearance, cornerRadius: 16)
+                if selectedDay != nil { dayDetail }
+                todaySectionView
+                quickAdd
+            }
+        case .all:
+            VStack(alignment: .leading, spacing: 12) {
+                if isEditing {
+                    editList
+                    quickAdd
+                } else {
+                    allHabitsRows
+                    quickAdd
+                }
+            }
+        case .paused:
+            if pausedHabits.isEmpty {
+                ContentUnavailableView(
+                    "Nothing paused",
+                    systemImage: "pause.circle",
+                    description: Text("Habits you snooze will appear here.")
+                )
+                .frame(maxWidth: .infinity)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(pausedHabits) { pausedRow($0) }
+                }
+            }
+        }
+    }
+
+    /// Single-selection binding for the sidebar (List wants an optional selection).
+    private var macSelectionBinding: Binding<MacSection?> {
+        Binding(get: { macSection }, set: { if let value = $0 { macSection = value } })
+    }
+
+    private var detailHabitBinding: Binding<Bool> {
+        Binding(get: { detailHabit != nil }, set: { if !$0 { detailHabit = nil } })
+    }
+
+    @ToolbarContentBuilder
+    private var spanToolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Picker("Span", selection: $span) {
+                ForEach(Span.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.menu)
+        }
+    }
+
+    /// Edit toggle for the macOS "All Habits" pane (minimalist keeps its in-content pencil).
+    @ToolbarContentBuilder
+    private var macEditToolbar: some ToolbarContent {
+        if macSection == .all {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    withAnimation(.snappy) { isEditing.toggle() }
+                } label: {
+                    Image(systemName: isEditing ? "checkmark.circle.fill" : "square.and.pencil")
+                }
+                .help(isEditing ? "Done editing" : "Edit habits")
             }
         }
     }
@@ -316,8 +442,7 @@ struct HomeView: View {
             }
             .fixedSize(horizontal: true, vertical: false)   // hug content width
             .padding(14)
-            .background(Color.secondary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .surface(appearance, cornerRadius: 12)
             .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
@@ -449,6 +574,7 @@ struct HomeView: View {
         .padding(.vertical, 4)
         .opacity(0.7)
         .contextMenu { editDeleteMenu(habit) }
+        .rowHover(appearance == .macOS)
     }
 
     // MARK: Edit mode
@@ -521,8 +647,7 @@ struct HomeView: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
-        .background(Color.secondary.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .surface(appearance, cornerRadius: 8)
         .contentShape(Rectangle())
     }
 
@@ -590,6 +715,7 @@ struct HomeView: View {
             if nowDone { SoundEffects.playCheck() }
         })
         .contextMenu { editDeleteMenu(habit) }
+        .rowHover(appearance == .macOS)
     }
 
     /// A non-checkable row for habits not due today: shows the next occurrence. Tap opens progress.
@@ -616,6 +742,7 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .contextMenu { editDeleteMenu(habit) }
+        .rowHover(appearance == .macOS)
     }
 
     @ViewBuilder
@@ -673,8 +800,7 @@ struct HomeView: View {
                 .disabled(newHabitName.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         .padding(10)
-        .background(Color.secondary.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .surface(appearance, cornerRadius: 10, minimalOpacity: 0.10)
     }
 
     private func addHabit() {

@@ -31,6 +31,9 @@ struct SettingsView: View {
     @ObservedObject private var phoneSync = PhoneSyncService.shared
     @State private var showingPhoneSetup = false
 
+    @AppStorage(AppearanceStyle.storageKey, store: CommitConstants.sharedDefaults)
+    private var appearanceStyle: AppearanceStyle = .minimalist
+
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
     @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
@@ -41,6 +44,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            interfaceSection
             appearanceSection
             reminderSection
             layoutSection
@@ -130,7 +134,7 @@ struct SettingsView: View {
         } header: {
             Text("Layout")
         } footer: {
-            Text("How habits that aren't due today appear on the main page, and how each one's next occurrence is written.")
+            Text("How habits that aren't due today appear on the main page, and how each one's next occurrence is written. The “Other habits” choice applies to the Minimalist style; the macOS style uses its sidebar instead.")
         }
     }
 
@@ -221,6 +225,23 @@ struct SettingsView: View {
     private func setTesterDate(_ date: Date) {
         testerDate = date
         AppClock.overrideDate = date
+    }
+
+    // MARK: Interface
+
+    private var interfaceSection: some View {
+        Section {
+            Picker("Window style", selection: $appearanceStyle) {
+                ForEach(AppearanceStyle.allCases) { style in
+                    Text(style.label).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Interface")
+        } footer: {
+            Text("\(appearanceStyle.blurb) Changes apply immediately.")
+        }
     }
 
     // MARK: Appearance
