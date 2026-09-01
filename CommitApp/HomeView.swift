@@ -501,6 +501,48 @@ struct HomeView: View {
         }
     }
 
+    private var activeDateNavigator: some View {
+        HStack(spacing: 8) {
+            Button {
+                if let prev = Calendar.current.date(byAdding: .day, value: -1, to: activeDate) {
+                    selectDay(prev)
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+                    .padding(.trailing, 4)
+            }
+            .buttonStyle(.plain)
+
+            Text(isTodaySelected ? "Today" : activeDate.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
+                .font(.headline)
+                .foregroundStyle(isTodaySelected ? Color.primary : accent)
+            
+            Button {
+                if let next = Calendar.current.date(byAdding: .day, value: 1, to: activeDate) {
+                    selectDay(next)
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 4)
+            }
+            .buttonStyle(.plain)
+
+            if !isTodaySelected {
+                Button("Return to Today") {
+                    withAnimation(.snappy) { selectedDay = nil }
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(accent)
+                .padding(.leading, 8)
+            }
+        }
+    }
+
     /// Row under the graph: the Today/All scope toggle (in that layout) on the left, and the
     /// notepad button on the right — across from the scope — that toggles inline edit mode.
     private var habitsHeader: some View {
@@ -508,14 +550,17 @@ struct HomeView: View {
             if isEditing {
                 Text("Edit habits")
                     .font(.headline)
-            } else if otherHabitsStyle == .toggle {
+            } else if appearance == .minimalist {
+                activeDateNavigator
+            }
+            Spacer()
+            if !isEditing && otherHabitsStyle == .toggle && appearance == .minimalist {
                 Picker("Scope", selection: $scope) {
                     ForEach(Scope.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .fixedSize()
             }
-            Spacer()
             Button {
                 withAnimation(.snappy) { isEditing.toggle() }
             } label: {
@@ -662,46 +707,10 @@ struct HomeView: View {
 
     private var todaySectionView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Button {
-                    if let prev = Calendar.current.date(byAdding: .day, value: -1, to: activeDate) {
-                        selectDay(prev)
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                        .padding(.trailing, 4)
-                }
-                .buttonStyle(.plain)
-
-                Text(isTodaySelected ? "Today" : activeDate.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
-                    .font(.headline)
-                    .foregroundStyle(isTodaySelected ? Color.primary : accent)
-                
-                Button {
-                    if let next = Calendar.current.date(byAdding: .day, value: 1, to: activeDate) {
-                        selectDay(next)
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 4)
-                }
-                .buttonStyle(.plain)
-
-                if !isTodaySelected {
-                    Button("Return to Today") {
-                        withAnimation(.snappy) { selectedDay = nil }
-                    }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(accent)
-                    .padding(.leading, 8)
-                }
+            if appearance == .macOS {
+                activeDateNavigator
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             todayRows
         }
     }
