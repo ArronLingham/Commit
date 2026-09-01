@@ -75,10 +75,21 @@ struct HomeView: View {
     private let contentWidth: CGFloat = 660
     private var horizontalPadding: CGFloat { 20 }
 
+    private var activeDate: Date {
+        selectedDay ?? AppClock.now
+    }
+    
+    private var isTodaySelected: Bool {
+        Calendar.current.isDate(activeDate, inSameDayAs: AppClock.now)
+    }
+
     private var todaysHabits: [Habit] {
-        // Hide times-per-week / month habits once the target is met — but not on the day you
-        // checked off the last one (see Habit.isDueForList). Paused habits are hidden too.
-        habits.filter { !$0.isPaused() && $0.isDueForList() }
+        let day = Calendar.current.startOfDay(for: activeDate)
+        return habits.filter {
+            Calendar.current.startOfDay(for: $0.createdAt) <= day
+                && !$0.isPausedDay(activeDate)
+                && $0.isDueForList(on: activeDate)
+        }
     }
 
     private var upcomingHabits: [Habit] {
@@ -116,7 +127,6 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     graphSection
-                    if selectedDay != nil { dayDetail }
                     Divider()
                     habitsArea
                 }
@@ -179,7 +189,6 @@ struct HomeView: View {
                     .padding(20)
                     .frame(maxWidth: .infinity)
                     .surface(appearance, cornerRadius: 16)
-                if selectedDay != nil { dayDetail }
                 todaySectionView
                 quickAdd
             }
@@ -653,9 +662,46 @@ struct HomeView: View {
 
     private var todaySectionView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Today")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Button {
+                    if let prev = Calendar.current.date(byAdding: .day, value: -1, to: activeDate) {
+                        selectDay(prev)
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 4)
+                        .padding(.trailing, 4)
+                }
+                .buttonStyle(.plain)
+
+                Text(isTodaySelected ? "Today" : activeDate.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
+                    .font(.headline)
+                    .foregroundStyle(isTodaySelected ? Color.primary : accent)
+                
+                Button {
+                    if let next = Calendar.current.date(byAdding: .day, value: 1, to: activeDate) {
+                        selectDay(next)
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 4)
+                }
+                .buttonStyle(.plain)
+
+                if !isTodaySelected {
+                    Button("Return to Today") {
+                        withAnimation(.snappy) { selectedDay = nil }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(accent)
+                    .padding(.leading, 8)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             todayRows
         }
     }
@@ -706,11 +752,11 @@ struct HomeView: View {
 
     /// A checkable habit row (today's habits). Tapping the name opens progress; the circle toggles.
     private func checkableRow(_ habit: Habit) -> some View {
-        HabitRow(habit: habit, accent: accent, now: AppClock.now, openDetail: {
+        HabitRow(habit: habit, accent: accent, now: activeDate, openDetail: {
             detailHabit = habit
         }, toggle: {
             let nowDone = withAnimation(.snappy) {
-                HabitActions.toggleCompletion(for: habit, in: context)
+                HabitActions.toggleCompletion(for: habit, on: activeDate, in: context)
             }
             if nowDone { SoundEffects.playCheck() }
         })

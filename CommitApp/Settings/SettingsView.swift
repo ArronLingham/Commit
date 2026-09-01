@@ -30,6 +30,7 @@ struct SettingsView: View {
     private var phoneSyncEnabled = false
     @ObservedObject private var phoneSync = PhoneSyncService.shared
     @State private var showingPhoneSetup = false
+    @State private var showingPauseAllSheet = false
 
     @AppStorage(AppearanceStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var appearanceStyle: AppearanceStyle = .minimalist
@@ -46,6 +47,7 @@ struct SettingsView: View {
         Form {
             interfaceSection
             appearanceSection
+            vacationSection
             reminderSection
             layoutSection
             menuBarSection
@@ -57,6 +59,9 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .sheet(isPresented: $showingPhoneSetup) {
             PhoneSetupView(folderName: phoneSync.folderName)
+        }
+        .sheet(isPresented: $showingPauseAllSheet) {
+            PauseAllSheet()
         }
         .onAppear {
             reminderTime = Calendar.current.date(
@@ -228,6 +233,18 @@ struct SettingsView: View {
     }
 
     // MARK: Interface
+    
+    private var vacationSection: some View {
+        Section {
+            Button("Pause All Habits…") {
+                showingPauseAllSheet = true
+            }
+        } header: {
+            Text("Vacation Mode")
+        } footer: {
+            Text("Pause all habits at once. Useful for taking a break or going on vacation.")
+        }
+    }
 
     private var interfaceSection: some View {
         Section {
