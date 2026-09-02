@@ -64,11 +64,20 @@ struct MenuBarView: View {
             Divider()
 
             if todaysHabits.isEmpty {
-                Text("Nothing scheduled today")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 8)
+                // During a vacation everything is paused, and "Nothing scheduled today" would
+                // read as "you have no habits" rather than "you're away".
+                VStack(spacing: 2) {
+                    Text(Vacation.isActive() ? "Paused" : "Nothing scheduled today")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if let status = Vacation.statusText() {
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 8)
             } else {
                 VStack(spacing: 6) {
                     ForEach(todaysHabits) { habit in

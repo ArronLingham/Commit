@@ -275,6 +275,34 @@ public extension Habit {
         return true
     }
 
+    /// Whether this habit belongs on the page's list for `day` — the date-scoped generalisation
+    /// of `isDueForList`, used once the Home page can browse to any date.
+    ///
+    /// Today and future days keep todo-list semantics: times-per-week / month habits drop off
+    /// once the period target is met. A **past day is a record, not a todo list**, so it lists
+    /// everything that was scheduled that day even if the week later filled up — otherwise a past
+    /// Tuesday would become un-backfillable the moment Saturday hit the target.
+    ///
+    /// The pause test deliberately differs by direction and must not be "simplified" to one call:
+    /// - past → `isPausedDay` (current window ∪ `pauseHistoryDates`), so days genuinely snoozed
+    ///   render as snoozed rather than as plain missable rows;
+    /// - today/future → `isPaused` (the live window only), because `pause` archives the whole
+    ///   previous window before overwriting it, so after a Resume `isPausedDay` is still true for
+    ///   today via the archived span and the habit would never come back to the list.
+    func belongsOnList(for day: Date, today: Date = AppClock.now, calendar: Calendar = .current) -> Bool {
+        let d = calendar.startOfDay(for: day)
+        // Nothing existed before the habit did — keeps past days from offering check-offs that
+        // `longestStreak` / `completionRate` would then ignore, since both scan from `createdAt`.
+        guard calendar.startOfDay(for: createdAt) <= d else { return false }
+
+        if d < calendar.startOfDay(for: today) {
+            guard !isPausedDay(d, calendar: calendar) else { return false }
+            return schedule.isScheduled(on: d, calendar: calendar)
+        }
+        guard !isPaused(asOf: d) else { return false }
+        return isDueForList(on: d, calendar: calendar)
+    }
+
     // MARK: Pause / snooze
 
     /// Whether the habit is currently paused (hidden from the Today list) as of `date`.
@@ -333,6 +361,8 @@ public extension Habit {
                     streak += 1
                 } else if calendar.isDate(weekStart, inSameDayAs: currentWeekStart) {
                     // Current week still in progress — don't count, don't break.
+                } else if isFullyPausedPeriod(start: weekStart, end: weekEnd, calendar: calendar) {
+                    // Paused all week — neutral: skip it without breaking the run.
                 } else {
                     break
                 }
@@ -357,6 +387,8 @@ public extension Habit {
                     streak += 1
                 } else if calendar.isDate(monthStart, equalTo: currentMonthStart, toGranularity: .month) {
                     // Current month still in progress — don't count, don't break.
+                } else if isFullyPausedPeriod(start: monthStart, end: monthEnd, calendar: calendar) {
+                    // Paused all month — neutral: skip it without breaking the run.
                 } else {
                     break
                 }
@@ -457,6 +489,30 @@ public extension Habit {
 
     // MARK: Period-habit helpers (weeks / months)
 
+    /// True when *every* day of `[start, end]` was paused. Such a period is neutral: it neither
+    /// extends nor breaks a period streak, and it stays out of the completion-rate denominator.
+    ///
+    /// Without this a `.timesPerWeek` / `.timesPerMonth` habit's streak breaks and its rate drops
+    /// across a pause — the daily branch of `currentStreak` has always skipped paused days, but
+    /// the period branches score whole periods and never consulted the pause windows. That turns
+    /// "pause all for a fortnight" into mass streak damage, on the very feature meant to prevent it.
+    ///
+    /// A *partially* paused period still scores against the full target (a 3×/week habit paused
+    /// Thu–Sun must still manage 3 in Mon–Wed). Pro-rating the target is the fuller fix; skipping
+    /// whole periods covers the interior of any pause of a week or more, which is the case that
+    /// matters.
+    func isFullyPausedPeriod(start: Date, end: Date, calendar: Calendar = .current) -> Bool {
+        var day = calendar.startOfDay(for: start)
+        let last = calendar.startOfDay(for: end)
+        guard day <= last else { return false }
+        while day <= last {
+            if !isPausedDay(day, calendar: calendar) { return false }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { return false }
+            day = next
+        }
+        return true
+    }
+
     private func periodBounds(start: Date, weekly: Bool, calendar: Calendar) -> (start: Date, end: Date) {
         if weekly {
             let s = calendar.startOfWeek(for: start)
@@ -480,6 +536,8 @@ public extension Habit {
                 maxRun = max(maxRun, run)
             } else if isCurrent {
                 // In-progress period — don't reset.
+            } else if isFullyPausedPeriod(start: bounds.start, end: bounds.end, calendar: calendar) {
+                // Paused for the whole period — neutral: carry the run across it.
             } else {
                 run = 0
             }
@@ -495,7 +553,8 @@ public extension Habit {
             safety += 1
             let bounds = periodBounds(start: periodStart, weekly: weekly, calendar: calendar)
             let isCurrent = today >= bounds.start && today <= bounds.end
-            if !isCurrent {   // only score fully-elapsed periods
+            // Only score fully-elapsed periods, and not ones spent entirely paused.
+            if !isCurrent, !isFullyPausedPeriod(start: bounds.start, end: bounds.end, calendar: calendar) {
                 total += 1
                 let count = completed.filter { $0 >= bounds.start && $0 <= bounds.end }.count
                 if count >= target { met += 1 }

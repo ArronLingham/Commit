@@ -63,6 +63,14 @@ public enum HabitActions {
             sortOrder: nextOrder
         )
         context.insert(habit)
+        // Added mid-vacation: start it paused for the rest of the trip and register it, so
+        // "resume all" releases it too instead of leaving it stranded.
+        if var vacation = Vacation.activeRecord() {
+            habit.pausedFrom = Calendar.current.startOfDay(for: AppClock.now)
+            habit.pausedUntil = vacation.endsOn
+            vacation.createdForHabitIDs.append(habit.id.uuidString)
+            Vacation.record = vacation
+        }
         try? context.save()
         return habit
     }
@@ -107,6 +115,7 @@ public enum HabitActions {
         try? context.save()
     }
 
+
     /// End a pause now. Truncates the window to `[pausedFrom, today)`, so the days already spent
     /// paused stay neutral while today counts again — resuming the same day you paused leaves an
     /// empty window, which is intentional: the habit is back on your list for today.
@@ -114,6 +123,131 @@ public enum HabitActions {
         habit.pausedUntil = Calendar.current.startOfDay(for: AppClock.now)
         habit.updatedAt = Date()
         try? context.save()
+    }
+
+    // MARK: Pause all (vacation)
+
+    /// Every habit the "pause all" family operates on: active ones only. Deliberately *not* the
+    /// unfiltered fetch `addHabit` uses — pausing tombstones would bump their `updatedAt` and make
+    /// them the winning side of a future sync merge.
+    private static func activeHabits(in context: ModelContext) -> [Habit] {
+        let descriptor = FetchDescriptor<Habit>(
+            predicate: #Predicate { !$0.isArchived && !$0.isDeleted }
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Pause **every** active habit until `until` — vacation mode.
+    ///
+    /// Each habit is handled by how it stands right now, so the vacation never destroys an
+    /// individual snooze:
+    /// - already paused *past* `until` → left completely alone (no write at all);
+    /// - already paused *before* `until` → only `pausedUntil` is extended, nothing is archived,
+    ///   and the previous value is remembered so `resumeAll` can put it back;
+    /// - otherwise → a normal `[today, until)` window, archiving any stale one exactly as
+    ///   `pause(_:until:in:)` does.
+    ///
+    /// Calling this during a running vacation extends it and merges into the same record.
+    /// - Returns: how many habits were paused or extended.
+    @discardableResult
+    public static func pauseAll(until: Date, in context: ModelContext) -> Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: AppClock.now)
+        let end = calendar.startOfDay(for: until)
+        // "Pause until today" would cover no days — same floor as PauseSheet's `in: tomorrow...`.
+        guard end > today else { return 0 }
+
+        var created: [String] = []
+        var priors: [String: Date] = [:]
+        var changed = 0
+
+        for habit in activeHabits(in: context) {
+            let id = habit.id.uuidString
+            if habit.isPaused(asOf: AppClock.now), let existingUntil = habit.pausedUntil {
+                let existing = calendar.startOfDay(for: existingUntil)
+                // Already snoozed past the trip — leave it entirely alone.
+                guard existing < end else { continue }
+                // Extend in place: no window is archived, so ending early can't strand a stripe.
+                priors[id] = existing
+                habit.pausedUntil = end
+            } else {
+                if let previous = habit.currentPauseSpan {
+                    habit.pauseHistory = PauseSpan.merged(habit.pauseHistory + [previous])
+                }
+                habit.pausedFrom = today
+                habit.pausedUntil = end
+                created.append(id)
+            }
+            habit.updatedAt = Date()
+            changed += 1
+        }
+
+        if var existing = Vacation.activeRecord() {
+            existing.endsOn = max(existing.endsOn, end)
+            existing.createdForHabitIDs.append(contentsOf: created)
+            // Never overwrite a remembered prior — the first one recorded is the true
+            // pre-vacation value.
+            for (id, prior) in priors where existing.extendedPriorUntil[id] == nil {
+                existing.extendedPriorUntil[id] = prior
+            }
+            Vacation.record = existing
+        } else {
+            Vacation.record = VacationRecord(
+                startedOn: today,
+                endsOn: end,
+                createdForHabitIDs: created,
+                extendedPriorUntil: priors
+            )
+        }
+
+        try? context.save()
+        return changed
+    }
+
+    /// End the vacation now, restoring what each habit's pause was *before* it.
+    ///
+    /// Habits the vacation created a window for are truncated to `[from, today)` — identical to
+    /// `resume`. Habits it merely extended get `max(prior, today)`, so a still-live individual
+    /// snooze survives intact while one that expired mid-trip doesn't retroactively turn the
+    /// vacation days into misses. Habits the vacation never touched aren't touched now either.
+    ///
+    /// With no record (reinstall, another device) this degrades to resuming every paused habit.
+    /// - Returns: how many habits were resumed or restored.
+    @discardableResult
+    public static func resumeAll(in context: ModelContext) -> Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: AppClock.now)
+
+        // `record`, not `activeRecord` — you must be able to unwind a vacation on its final day.
+        guard let vacation = Vacation.record else {
+            var count = 0
+            for habit in activeHabits(in: context) where habit.isPaused(asOf: AppClock.now) {
+                habit.pausedUntil = today
+                habit.updatedAt = Date()
+                count += 1
+            }
+            try? context.save()
+            return count
+        }
+
+        let created = Set(vacation.createdForHabitIDs)
+        var count = 0
+        for habit in activeHabits(in: context) {
+            let id = habit.id.uuidString
+            if created.contains(id) {
+                habit.pausedUntil = today
+            } else if let prior = vacation.extendedPriorUntil[id] {
+                habit.pausedUntil = max(calendar.startOfDay(for: prior), today)
+            } else {
+                continue
+            }
+            habit.updatedAt = Date()
+            count += 1
+        }
+
+        Vacation.record = nil
+        try? context.save()
+        return count
     }
 
     /// Persist a new ordering: rewrite each habit's `sortOrder` to its index in `ordered`.

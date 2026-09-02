@@ -236,13 +236,29 @@ struct SettingsView: View {
     
     private var vacationSection: some View {
         Section {
-            Button("Pause All Habits…") {
-                showingPauseAllSheet = true
+            if let status = Vacation.statusText() {
+                LabeledContent("Status", value: status)
+                Button("Resume All Habits") {
+                    HabitActions.resumeAll(in: SharedModelContainer.shared.mainContext)
+                    ReminderScheduler.refresh()   // re-arm the nightly reminder
+                }
+            } else {
+                Button("Pause All Habits…") {
+                    showingPauseAllSheet = true
+                }
+                // Tester Mode only rewinds completions, so a pause-all made while testing would
+                // be permanent real data — and moving the simulated date mid-vacation corrupts
+                // the window `resumeAll` writes back.
+                .disabled(testerModeEnabled)
             }
         } header: {
             Text("Vacation Mode")
         } footer: {
-            Text("Pause all habits at once. Useful for taking a break or going on vacation.")
+            Text(
+                Vacation.isActive()
+                    ? "Paused days stay neutral — they won't count as missed or break your streaks."
+                    : "Pause all habits at once. Useful for taking a break or going on vacation."
+            )
         }
     }
 

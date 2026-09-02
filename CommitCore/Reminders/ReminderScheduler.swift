@@ -28,8 +28,13 @@ public enum ReminderScheduler {
 
     /// Schedule or cancel the reminder based on the stored preferences. Permission is only
     /// requested when the reminder is enabled, so disabled users never see a prompt.
+    ///
+    /// A running "pause all" silences the
+    /// reminder — nagging you to check off habits every night of a holiday is the opposite of
+    /// what pausing them was for. `pauseAll` / `resumeAll` both call this, and so does app
+    /// launch, so the reminder re-arms when the vacation ends.
     public static func refresh() {
-        guard isEnabled else { cancel(); return }
+        guard isEnabled, !Vacation.isActive() else { cancel(); return }
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             DispatchQueue.main.async {
