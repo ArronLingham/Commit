@@ -122,8 +122,26 @@ final class PhoneSyncService: ObservableObject {
             menu["\(habit.done ? "✓" : "○") \(habit.name)"] = habit.id
         }
 
+        // Ready-made counts and a notification line, so the iPhone's time-of-day automation can
+        // post a reminder by reading one string — no logic on the phone, and it still works from
+        // the last published file while the Mac is asleep.
+        let doneCount = today.filter(\.done).count
+        let remaining = today.count - doneCount
+        let summary: String
+        if today.isEmpty {
+            summary = "Nothing scheduled today."
+        } else if remaining == 0 {
+            summary = "All \(today.count) habits done today."
+        } else if remaining == today.count {
+            summary = "\(remaining) \(remaining == 1 ? "habit" : "habits") to go today."
+        } else {
+            summary = "\(doneCount) of \(today.count) done — \(remaining) to go."
+        }
+
         let file = SyncTodayFile(date: Self.dayFormatter.string(from: AppClock.now),
-                                 habits: today, menu: menu)
+                                 habits: today, menu: menu,
+                                 done: doneCount, remaining: remaining, summary: summary,
+                                 reminderTime: Self.reminderTime())
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(file),
@@ -154,17 +172,29 @@ final class PhoneSyncService: ObservableObject {
     }
 
     private func apply(_ command: SyncCommand) {
-        guard let uuid = UUID(uuidString: command.id) else { return }
-        let match = try? context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == uuid }))
-        guard let habit = match?.first else { return }
-        switch command.action {
-        case "toggle":
-            HabitActions.toggleCompletion(for: habit, in: context)
-        default:
-            break
+        // `ids` toggles several habits from one file; `id` is the original single-habit form and
+        // still decodes, so a Shortcut built before batching keeps working.
+        let ids = command.ids ?? [command.id].compactMap { $0 }
+        guard !ids.isEmpty else { return }
+        for raw in ids {
+            guard let uuid = UUID(uuidString: raw) else { continue }
+            let match = try? context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == uuid }))
+            guard let habit = match?.first else { continue }
+            switch command.action {
+            case "toggle":
+                HabitActions.toggleCompletion(for: habit, in: context)
+            default:
+                break
+            }
         }
         // Force a fresh publish so the phone sees the new state promptly.
         lastTodayJSON = nil
+    }
+
+    /// The daily reminder time as "HH:mm", or nil when it's switched off.
+    private static func reminderTime() -> String? {
+        guard ReminderScheduler.isEnabled else { return nil }
+        return String(format: "%02d:%02d", ReminderScheduler.hour, ReminderScheduler.minute)
     }
 
     private static let dayFormatter: DateFormatter = {
@@ -189,9 +219,19 @@ private struct SyncTodayFile: Codable {
     let habits: [SyncHabit]
     /// "○ Meditate" / "✓ Read" → habit id, for the iPhone Shortcut's Choose-from-List step.
     let menu: [String: String]
+    let done: Int
+    let remaining: Int
+    /// A finished notification line, e.g. "2 of 5 done — 3 to go." The phone shows this verbatim.
+    let summary: String
+    /// The Mac's daily reminder as "HH:mm", or nil when the reminder is off — lets you set the
+    /// iPhone automation to the same time, and notice when they drift apart.
+    let reminderTime: String?
 }
 
 private struct SyncCommand: Codable {
-    let id: String
+    /// A single habit id — the original wire format, kept so existing Shortcuts still work.
+    let id: String?
+    /// Several habit ids in one command, for a multi-select Shortcut.
+    let ids: [String]?
     let action: String
 }
