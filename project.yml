@@ -25,7 +25,7 @@ targets:
   # Shared framework: models, scheduling, persistence, theme, graph view.
   # ---------------------------------------------------------------------------
   CommitCore:
-    type: framework
+    type: framework.static
     supportedDestinations: [macOS]
     sources:
       - CommitCore
@@ -46,7 +46,7 @@ targets:
       - CommitApp
     dependencies:
       - target: CommitCore
-        embed: true
+        embed: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.arronlingham.commit
