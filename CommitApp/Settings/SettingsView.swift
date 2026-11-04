@@ -275,8 +275,8 @@ struct SettingsView: View {
                     Text(scheme.label).tag(scheme)
                 }
             }
-            accentSwatches
             if colorScheme == .informative { thresholdControls }
+            accentSwatches
         } header: {
             Text("Appearance")
         } footer: {
@@ -288,19 +288,21 @@ struct SettingsView: View {
 
     /// The app accent also supplies the hue for the GitHub-style graph.
     private var accentSwatches: some View {
-        HStack(spacing: 12) {
-            ForEach(Theme.presetAccents, id: \.self) { hex in
-                Circle()
-                    .fill(Color(hex: hex) ?? .gray)
-                    .frame(width: 28, height: 28)
-                    .overlay(Circle().strokeBorder(.primary, lineWidth: accentHex == hex ? 2.5 : 0))
-                    .onTapGesture {
-                        accentHex = hex
-                        Theme.setAccent(hex: hex)
-                    }
+        LabeledContent(colorScheme == .githubGreen ? "Graph and app accent" : "App accent") {
+            HStack(spacing: 12) {
+                ForEach(Theme.presetAccents, id: \.self) { hex in
+                    Circle()
+                        .fill(Color(hex: hex) ?? .gray)
+                        .frame(width: 28, height: 28)
+                        .overlay(Circle().strokeBorder(.primary, lineWidth: accentHex == hex ? 2.5 : 0))
+                        .onTapGesture {
+                            accentHex = hex
+                            Theme.setAccent(hex: hex)
+                        }
+                }
             }
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 4)
     }
 
     private var thresholdControls: some View {
