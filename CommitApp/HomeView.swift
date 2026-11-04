@@ -58,13 +58,13 @@ struct HomeView: View {
     @State private var macSection: MacSection = .today
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
-    @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
-    private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
-    // Observed only so the graph re-renders when the informative palette variant changes.
-    @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
-    private var informativePaletteRaw = InformativePalette.soft.rawValue
+    // Observe cutoff changes so every graph span updates immediately.
+    @AppStorage(InformativeThresholds.yellowKey, store: CommitConstants.sharedDefaults)
+    private var yellowStartsAt = InformativeThresholds.defaultYellow
+    @AppStorage(InformativeThresholds.redKey, store: CommitConstants.sharedDefaults)
+    private var redStartsAt = InformativeThresholds.defaultRed
     // The overall window look — minimalist single page vs. macOS sidebar layout.
     @AppStorage(AppearanceStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var appearanceRaw = AppearanceStyle.minimalist.rawValue
@@ -989,11 +989,7 @@ struct HomeView: View {
         }
         let weekday = date.formatted(.dateTime.weekday(.wide))
         let day = date.formatted(.dateTime.month(.abbreviated).day())
-        switch nextOccurrenceStyle {
-        case .weekday: return "Next: \(weekday)"
-        case .date: return "Next: \(day)"
-        case .weekdayAndDate: return "Next: \(weekday) · \(day)"
-        }
+        return "Next: \(weekday) · \(day)"
     }
 
     // MARK: Quick add

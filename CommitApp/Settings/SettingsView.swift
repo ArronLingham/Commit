@@ -3,7 +3,7 @@ import CommitCore
 import UserNotifications
 import AppKit
 
-/// Accent colour and about info.
+/// Everyday preferences for the app and its contribution graph.
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
 
@@ -17,8 +17,6 @@ struct SettingsView: View {
 
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
     private var otherHabitsStyle: OtherHabitsStyle = .upcoming
-    @AppStorage(NextOccurrenceStyle.storageKey, store: CommitConstants.sharedDefaults)
-    private var nextOccurrenceStyle: NextOccurrenceStyle = .weekdayAndDate
     @AppStorage(showMenuBarIconKey, store: CommitConstants.sharedDefaults)
     private var showMenuBarIcon = true
 
@@ -37,11 +35,10 @@ struct SettingsView: View {
 
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
-    @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
-    private var informativePaletteRaw = InformativePalette.soft.rawValue
-    private var informativePalette: InformativePalette {
-        InformativePalette(rawValue: informativePaletteRaw) ?? .soft
-    }
+    @AppStorage(InformativeThresholds.yellowKey, store: CommitConstants.sharedDefaults)
+    private var yellowStartsAt = InformativeThresholds.defaultYellow
+    @AppStorage(InformativeThresholds.redKey, store: CommitConstants.sharedDefaults)
+    private var redStartsAt = InformativeThresholds.defaultRed
 
     var body: some View {
         Form {
@@ -52,7 +49,7 @@ struct SettingsView: View {
             layoutSection
             menuBarSection
             phoneSyncSection
-            testerSection
+            if testerModeEnabled { testerSection }
             aboutSection
         }
         .formStyle(.grouped)
@@ -71,6 +68,14 @@ struct SettingsView: View {
                 of: Date()
             ) ?? Date()
             refreshNotifStatus()
+        }
+        .onChange(of: testerModeEnabled) { _, on in
+            if on {
+                AppClock.overrideDate = testerDate
+                HabitActions.beginTesterSession(in: context)
+            } else {
+                HabitActions.endTesterSession(in: context)
+            }
         }
     }
 
@@ -131,15 +136,10 @@ struct SettingsView: View {
                     Text(style.label).tag(style)
                 }
             }
-            Picker("Next occurrence", selection: $nextOccurrenceStyle) {
-                ForEach(NextOccurrenceStyle.allCases) { style in
-                    Text(style.label).tag(style)
-                }
-            }
         } header: {
             Text("Layout")
         } footer: {
-            Text("How habits that aren't due today appear on the main page, and how each one's next occurrence is written. The “Other habits” choice applies to the Minimalist style; the macOS style uses its sidebar instead.")
+            Text("How habits that aren't due today appear in Minimalist style. Liquid Glass uses its sidebar instead.")
         }
     }
 
@@ -187,17 +187,6 @@ struct SettingsView: View {
     private var testerSection: some View {
         Section {
             Toggle("Tester mode", isOn: $testerModeEnabled)
-                .onChange(of: testerModeEnabled) { _, on in
-                    if on {
-                        // Seed the override with the current picker value and snapshot the real
-                        // data so everything checked off while testing can be reverted.
-                        AppClock.overrideDate = testerDate
-                        HabitActions.beginTesterSession(in: context)
-                    } else {
-                        // Undo every completion change made during the tester session.
-                        HabitActions.endTesterSession(in: context)
-                    }
-                }
             if testerModeEnabled {
                 DatePicker("Simulated date", selection: $testerDate, displayedComponents: .date)
                     .onChange(of: testerDate) { _, newValue in
@@ -286,21 +275,18 @@ struct SettingsView: View {
                     Text(scheme.label).tag(scheme)
                 }
             }
-            if colorScheme == .githubGreen {
-                accentSwatches
-            } else {
-                paletteChoices
-            }
+            accentSwatches
+            if colorScheme == .informative { thresholdControls }
         } header: {
             Text("Appearance")
         } footer: {
             Text(colorScheme == .githubGreen
                  ? "GitHub style shades each day by how much you completed, in the accent colour you pick."
-                 : "Green · yellow · red colours each day by how many habits you missed. Pick a palette style for the graph.")
+                 : "Choose how many missed habits turn a day yellow or red. Days with none missed are green; days with no habits due stay neutral.")
         }
     }
 
-    /// GitHub-style: pick the single accent hue used across the app and the green graph.
+    /// The app accent also supplies the hue for the GitHub-style graph.
     private var accentSwatches: some View {
         HStack(spacing: 12) {
             ForEach(Theme.presetAccents, id: \.self) { hex in
@@ -317,40 +303,41 @@ struct SettingsView: View {
         .padding(.vertical, 4)
     }
 
-    /// Informative scheme: pick a shade/style of the green·yellow·red palette.
-    private var paletteChoices: some View {
-        ForEach(InformativePalette.allCases) { palette in
-            let selected = palette == informativePalette
-            HStack(spacing: 12) {
-                let colors = palette.colors
-                HStack(spacing: 4) {
-                    ForEach([colors.none, colors.one, colors.few, colors.many], id: \.self) { swatch in
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(swatch)
-                            .frame(width: 18, height: 18)
-                    }
+    private var thresholdControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Stepper("Yellow starts at \(yellowStartsAt) missed", value: $yellowStartsAt, in: 1...99)
+                .onChange(of: yellowStartsAt) { _, newValue in
+                    redStartsAt = max(redStartsAt, newValue + 1)
                 }
-                Text(palette.label)
-                Spacer()
-                if selected {
-                    Image(systemName: "checkmark").foregroundStyle(.tint)
+            Stepper("Red starts at \(redStartsAt) missed", value: $redStartsAt, in: 2...100)
+                .onChange(of: redStartsAt) { _, newValue in
+                    yellowStartsAt = min(yellowStartsAt, newValue - 1)
                 }
+            HStack(spacing: 6) {
+                thresholdLabel("Green", color: InformativeThresholds.allDoneColor,
+                               range: "0–\(yellowStartsAt - 1)")
+                thresholdLabel("Yellow", color: InformativeThresholds.yellowColor,
+                               range: "\(yellowStartsAt)–\(redStartsAt - 1)")
+                thresholdLabel("Red", color: InformativeThresholds.redColor,
+                               range: "\(redStartsAt)+")
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                informativePaletteRaw = palette.rawValue
-                // Keep the app's accent (checkmarks, buttons) coherent with the green graph.
-                accentHex = palette.allDoneHex
-                Theme.setAccent(hex: palette.allDoneHex)
-            }
+            .font(.caption)
         }
+        .padding(.vertical, 4)
+    }
+
+    private func thresholdLabel(_ title: String, color: Color, range: String) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 9, height: 9)
+            Text("\(title): \(range)")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: About
 
     private var aboutSection: some View {
         Section("About") {
-            LabeledContent("App", value: "Commit")
             LabeledContent("Version", value: appVersion)
         }
     }

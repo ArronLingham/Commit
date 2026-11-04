@@ -245,19 +245,16 @@ The whole app is one page (`CommitApp/HomeView.swift`) — no sidebar, no tabs:
 
 ## Settings
 
-`CommitApp/Settings/SettingsView.swift`:
+The graph can use GitHub-style intensity or green/yellow/red by missed habits.
+In Settings, choose the missed-habit count where yellow and red begin. The
+existing defaults remain 2 and 4 missed habits. The app accent has 8 presets.
 
-- **Accent** — 8 preset colours; also previews the graph's intensity scale.
-- **Reminder** — enable + pick a time for the daily notification.
-- **Layout** — two independent pickers:
-  - *Other habits*: how non-today habits are shown —
-    **Upcoming section** (separate list under Today),
-    **Today/All toggle** (segmented control swaps the whole list),
-    or **Collapsible list** (a `DisclosureGroup` under Today).
-  - *Next occurrence*: how a non-today habit's next date is worded —
-    **Weekday**, **Date**, or **Weekday + date**.
-- **Menu Bar** — show/hide the menu bar icon entirely.
-- **About** — app name and version (from the bundle's `Info.plist`).
+- **Reminder** — enable and choose a time for the daily notification.
+- **Other habits** — in Minimalist style, choose how non-today habits appear.
+- **Menu Bar** — show or hide the menu bar icon.
+- **Tester Mode** — shown only while an existing test session is active, so it
+  can be ended without exposing a development control in normal use.
+- **About** — the app version from the bundle's `Info.plist`.
 
 ## Notable bugs fixed along the way
 

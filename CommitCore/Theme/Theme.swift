@@ -41,17 +41,11 @@ public enum Theme {
 
     // MARK: Graph colour scheme
 
-    /// The currently selected informative palette variant, from shared defaults (default `.soft`).
-    public static func informativePalette() -> InformativePalette {
-        let raw = CommitConstants.sharedDefaults.string(forKey: InformativePalette.storageKey) ?? ""
-        return InformativePalette(rawValue: raw) ?? .soft
-    }
-
     /// Colour for a day's cell under the chosen scheme.
     ///
     /// - `.githubGreen`: intensity by how much of the day was completed, all in the accent hue.
-    /// - `.informative` (aggregate): read by how many scheduled habits were **missed** that day —
-    ///   0 → brightest green, 1 → step-down green, 2–3 → yellow, 4+ → red (selected palette). Days
+    /// - `.informative` (aggregate): read by how many scheduled habits were **missed** that day.
+    ///   The yellow and red cutoffs are configurable in Settings. Days
     ///   with nothing scheduled, and future days, stay neutral.
     /// - `.informative` with `singleHabit`: one habit can only be done or missed, so it's binary —
     ///   done → green, missed → red — with today-not-yet-done left neutral.
@@ -71,21 +65,19 @@ public enum Theme {
             // Nothing assessed that day (no habits due, or a future day) → neutral, never red.
             guard day.scheduled > 0 else { return emptyCell.opacity(0.5) }
 
-            let colors = informativePalette().colors
-
             if singleHabit {
                 // Don't flag an in-progress today red before it's had a chance to be done.
                 if day.missed > 0 && Calendar.current.isDate(day.date, inSameDayAs: AppClock.now) {
                     return emptyCell.opacity(0.5)
                 }
-                return day.missed == 0 ? colors.none : colors.many
+                return day.missed == 0 ? InformativeThresholds.allDoneColor : InformativeThresholds.redColor
             }
 
-            switch day.missed {
-            case 0: return colors.none
-            case 1: return colors.one
-            case 2...3: return colors.few
-            default: return colors.many
+            switch InformativeThresholds.current.category(forMissed: day.missed) {
+            case .green:
+                return day.missed == 0 ? InformativeThresholds.allDoneColor : InformativeThresholds.greenColor
+            case .yellow: return InformativeThresholds.yellowColor
+            case .red: return InformativeThresholds.redColor
             }
         }
     }
@@ -121,41 +113,42 @@ public enum GraphColorScheme: String, CaseIterable, Identifiable, Sendable {
     public static let storageKey = "graphColorScheme"
 }
 
-/// A shade/style variant for the informative (green·yellow·red) scheme. User-selectable in
-/// Settings when that scheme is active.
-public enum InformativePalette: String, CaseIterable, Identifiable, Sendable {
-    case soft, deep, vivid
+/// Miss-count cutoffs for the aggregate green/yellow/red graph. Existing installs keep
+/// the former 0–1 green, 2–3 yellow, 4+ red behavior until the user changes them.
+public struct InformativeThresholds: Sendable {
+    public enum Category: Equatable, Sendable { case green, yellow, red }
 
-    public var id: String { rawValue }
+    public static let yellowKey = "informativeYellowStartsAt"
+    public static let redKey = "informativeRedStartsAt"
+    public static let defaultYellow = 2
+    public static let defaultRed = 4
 
-    public var label: String {
-        switch self {
-        case .soft: return "Soft"
-        case .deep: return "Deep"
-        case .vivid: return "Vivid"
-        }
+    public let yellowStartsAt: Int
+    public let redStartsAt: Int
+
+    public init(yellowStartsAt: Int = defaultYellow, redStartsAt: Int = defaultRed) {
+        self.yellowStartsAt = min(99, max(1, yellowStartsAt))
+        self.redStartsAt = min(100, max(self.yellowStartsAt + 1, redStartsAt))
     }
 
-    /// Hex for the "all done" green — also used as the app accent when this palette is chosen.
-    public var allDoneHex: String {
-        switch self {
-        case .soft: return "#4CAF6E"
-        case .deep: return "#2E7D46"
-        case .vivid: return "#2FB457"
-        }
+    public static var current: Self {
+        let defaults = CommitConstants.sharedDefaults
+        return Self(
+            yellowStartsAt: defaults.object(forKey: yellowKey) as? Int ?? defaultYellow,
+            redStartsAt: defaults.object(forKey: redKey) as? Int ?? defaultRed
+        )
     }
 
-    /// The four cell colours: none (all done) → one → few (2–3) → many (4+ missed).
-    public var colors: (none: Color, one: Color, few: Color, many: Color) {
-        func c(_ hex: String) -> Color { Color(hex: hex) ?? .gray }
-        switch self {
-        case .soft: return (c("#4CAF6E"), c("#8BC28A"), c("#E0B152"), c("#D06B62"))
-        case .deep: return (c("#2E7D46"), c("#5C9A5E"), c("#C99A3B"), c("#B4453F"))
-        case .vivid: return (c("#2FB457"), c("#7DCB6B"), c("#F2C14E"), c("#EF5350"))
-        }
+    public func category(forMissed missed: Int) -> Category {
+        if missed >= redStartsAt { return .red }
+        if missed >= yellowStartsAt { return .yellow }
+        return .green
     }
 
-    public static let storageKey = "informativePalette"
+    public static var allDoneColor: Color { Color(hex: "#4CAF6E")! }
+    public static var greenColor: Color { Color(hex: "#8BC28A")! }
+    public static var yellowColor: Color { Color(hex: "#E0B152")! }
+    public static var redColor: Color { Color(hex: "#D06B62")! }
 }
 
 public extension Color {

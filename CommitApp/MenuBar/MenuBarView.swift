@@ -24,9 +24,11 @@ struct MenuBarView: View {
     private var testerOverride = 0.0
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
-    // Observed only so the mini graph re-renders when the informative palette variant changes.
-    @AppStorage(InformativePalette.storageKey, store: CommitConstants.sharedDefaults)
-    private var informativePaletteRaw = InformativePalette.soft.rawValue
+    // Observe cutoff changes so the mini graph updates immediately.
+    @AppStorage(InformativeThresholds.yellowKey, store: CommitConstants.sharedDefaults)
+    private var yellowStartsAt = InformativeThresholds.defaultYellow
+    @AppStorage(InformativeThresholds.redKey, store: CommitConstants.sharedDefaults)
+    private var redStartsAt = InformativeThresholds.defaultRed
 
     private var todaysHabits: [Habit] {
         // Hide times-per-week / month habits once the target is met — but not on the day you
