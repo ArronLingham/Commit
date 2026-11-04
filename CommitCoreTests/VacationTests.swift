@@ -16,7 +16,11 @@ final class VacationTests: XCTestCase {
     }
 
     private func complete(_ habit: Habit, daysAgo: Int, in context: ModelContext) {
-        let completion = HabitCompletion(day: startOfDay(daysAgo: daysAgo))
+        complete(habit, on: startOfDay(daysAgo: daysAgo), in: context)
+    }
+
+    private func complete(_ habit: Habit, on day: Date, in context: ModelContext) {
+        let completion = HabitCompletion(day: day)
         context.insert(completion)
         if habit.completions == nil { habit.completions = [] }
         habit.completions?.append(completion)
@@ -161,27 +165,37 @@ final class VacationTests: XCTestCase {
     func testTimesPerWeekStreakSurvivesAFullyPausedWeek() throws {
         let context = makeContext()
         let habit = Habit(name: "Run", schedule: .timesPerWeek(2))
-        habit.createdAt = startOfDay(daysAgo: 40)
+        let thisWeek = calendar.startOfWeek(for: startOfDay(daysAgo: 0))
+        func weekStart(_ weeksAgo: Int) -> Date {
+            calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: thisWeek)!
+        }
+        habit.createdAt = weekStart(5)
         context.insert(habit)
 
-        // Hit the target this week and in the weeks either side of a paused one.
-        for daysAgo in [0, 1, 7, 8, 21, 22, 28, 29] { complete(habit, daysAgo: daysAgo, in: context) }
-        // Paused across the whole week ~14-20 days ago, so it was never missed.
-        habit.pausedFrom = calendar.startOfWeek(for: startOfDay(daysAgo: 17))
-        habit.pausedUntil = calendar.date(
-            byAdding: .day, value: 7, to: calendar.startOfWeek(for: startOfDay(daysAgo: 17))
-        )!
+        // Meet the target last week and in the two weeks before a one-week break.
+        // Construct dates from week boundaries so the fixture works on every weekday.
+        for weeksAgo in [1, 3, 4] {
+            for dayOffset in 0...1 {
+                let day = calendar.date(byAdding: .day, value: dayOffset, to: weekStart(weeksAgo))!
+                complete(habit, on: day, in: context)
+            }
+        }
+        try context.save()
+        XCTAssertEqual(habit.currentStreak(), 1, "the unpaused gap breaks the streak")
+
+        habit.pausedFrom = weekStart(2)
+        habit.pausedUntil = weekStart(1)
         try context.save()
 
         XCTAssertTrue(
             habit.isFullyPausedPeriod(
-                start: calendar.startOfWeek(for: startOfDay(daysAgo: 17)),
-                end: calendar.endOfWeek(for: startOfDay(daysAgo: 17))
+                start: weekStart(2),
+                end: calendar.endOfWeek(for: weekStart(2))
             ),
             "that week should read as fully paused"
         )
-        XCTAssertGreaterThan(
-            habit.currentStreak(), 2,
+        XCTAssertEqual(
+            habit.currentStreak(), 3,
             "the streak must span the paused week rather than break on it"
         )
     }
