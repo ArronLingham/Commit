@@ -23,6 +23,7 @@ struct CommitApp: App {
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView()
+                .focusEffectForInput()
         }
         .modelContainer(container)
         .defaultSize(width: 700, height: 720)
@@ -31,6 +32,7 @@ struct CommitApp: App {
         // Quick check-off from the menu bar.
         MenuBarExtra("Commit", systemImage: "checkmark.seal", isInserted: $showMenuBarIcon) {
             MenuBarView()
+                .focusEffectForInput()
                 .modelContainer(container)
                 .frame(width: 320)
         }
@@ -38,6 +40,7 @@ struct CommitApp: App {
 
         Settings {
             SettingsView()
+                .focusEffectForInput()
                 .modelContainer(container)
                 .frame(width: 420, height: 460)
         }
