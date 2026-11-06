@@ -21,17 +21,21 @@ struct PhoneSetupView: View {
             ("Parse it",
              "Add “Get Dictionary from Input” (it takes the file)."),
             ("Get the menu",
-             "Add “Get Dictionary Value” → Get Value for “menu”. Then add another “Get Dictionary Value” → Get “All Keys” of that menu."),
-            ("Show the list",
-             "Add “Choose from List”, input = the keys. This shows your habits with ○ (not done) / ✓ (done)."),
-            ("Find the picked habit’s id",
-             "Add “Get Dictionary Value” → Get Value for [Chosen Item] from the menu dictionary. This is the habit’s id."),
-            ("Build the command",
-             "Add “Text” with exactly: {\"id\":\"[Dictionary Value]\",\"action\":\"toggle\"} — insert the id from the previous step where [Dictionary Value] is."),
+             "Add “Get Dictionary Value” → Get Value for “menu”. Add “Set Variable” and name it Habit Menu. Then add another “Get Dictionary Value” → Get “All Keys” of Habit Menu."),
+            ("Choose several habits",
+             "Add “Choose from List” with the keys as input. Open its options and turn ON “Select Multiple”. Choose the habits you want to mark complete; ○ means not yet done and ✓ means already done."),
+            ("Handle an empty selection",
+             "Add “If”: if Chosen Items does not have any value, add “Stop This Shortcut” inside the If. Place the remaining actions after End If."),
+            ("Look up each selection",
+             "Add “Repeat with Each” using Chosen Items. Inside the repeat, add “Get Dictionary Value”: get the value for Repeat Item from Habit Menu. End Repeat collects the habit IDs as Repeat Results."),
+            ("Join the IDs",
+             "Add “Combine Text” after End Repeat, using Repeat Results. Choose Custom as the separator and type a double quote, comma, double quote: \",\"."),
+            ("Build one command",
+             "Add a Text action containing: {\"ids\":[\"[Combined Text]\"],\"action\":\"complete\"}. Replace [Combined Text] with the Combined Text magic variable; keep the surrounding quotes and brackets."),
             ("Send it to the Mac",
-             "Add “Save File”. Turn OFF “Ask Where to Save”, set Destination to iCloud Drive → \(folder)/inbox/. Give it a unique name, e.g. combine the id with the Current Date. Save."),
+             "Add “Current Date”, “Format Date” including seconds, and “Random Number”. Add “Set Name” to the command Text, using the formatted date and random number for a unique name ending in .json. Add “Save File” to iCloud Drive → \(folder)/inbox/ and turn off “Ask Where to Save”."),
             ("Use it anywhere",
-             "Run the shortcut from the Shortcuts app, add it to your Home/Lock Screen, or say “Hey Siri, Commit”. Your Mac applies the toggle within a few seconds while the app is running."),
+             "Run the shortcut, choose multiple habits, and tap Done. Your Mac marks them complete while Commit is running; already completed habits stay complete. Changes appear after iCloud syncs."),
         ]
     }
 
@@ -39,7 +43,7 @@ struct PhoneSetupView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Set this up once on your iPhone. It reads today’s habits from the shared iCloud Drive folder and sends a toggle back to your Mac — no account or App Store needed.")
+                    Text("Set this up once on your iPhone. It reads today’s habits from your shared iCloud Drive folder and marks your selections complete on your Mac.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }

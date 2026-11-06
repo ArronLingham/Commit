@@ -119,7 +119,9 @@ final class PhoneSyncService: ObservableObject {
         // A ready-made "label → id" menu so the iPhone Shortcut can Choose-from-List directly.
         var menu: [String: String] = [:]
         for habit in today {
-            menu["\(habit.done ? "✓" : "○") \(habit.name)"] = habit.id
+            let label = "\(habit.done ? "✓" : "○") \(habit.name)"
+            if menu[label] == nil { menu[label] = habit.id }
+            else { menu["\(label) · \(habit.id)"] = habit.id }
         }
 
         // Ready-made counts and a notification line, so the iPhone's time-of-day automation can
@@ -165,29 +167,14 @@ final class PhoneSyncService: ObservableObject {
             }
             guard url.pathExtension == "json",
                   let data = try? Data(contentsOf: url),
-                  let command = try? JSONDecoder().decode(SyncCommand.self, from: data) else { continue }
+                  let command = try? JSONDecoder().decode(PhoneSyncCommand.self, from: data) else { continue }
             apply(command)
             try? fm.removeItem(at: url)
         }
     }
 
-    private func apply(_ command: SyncCommand) {
-        // `ids` toggles several habits from one file; `id` is the original single-habit form and
-        // still decodes, so a Shortcut built before batching keeps working.
-        let ids = command.ids ?? [command.id].compactMap { $0 }
-        guard !ids.isEmpty else { return }
-        for raw in ids {
-            guard let uuid = UUID(uuidString: raw) else { continue }
-            let match = try? context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == uuid }))
-            guard let habit = match?.first else { continue }
-            switch command.action {
-            case "toggle":
-                HabitActions.toggleCompletion(for: habit, in: context)
-            default:
-                break
-            }
-        }
-        // Force a fresh publish so the phone sees the new state promptly.
+    private func apply(_ command: PhoneSyncCommand) {
+        command.apply(in: context)
         lastTodayJSON = nil
     }
 
@@ -205,7 +192,6 @@ final class PhoneSyncService: ObservableObject {
         return f
     }()
 }
-
 // MARK: - Wire formats (shared with the iPhone Shortcut)
 
 private struct SyncHabit: Codable {
@@ -226,12 +212,4 @@ private struct SyncTodayFile: Codable {
     /// The Mac's daily reminder as "HH:mm", or nil when the reminder is off — lets you set the
     /// iPhone automation to the same time, and notice when they drift apart.
     let reminderTime: String?
-}
-
-private struct SyncCommand: Codable {
-    /// A single habit id — the original wire format, kept so existing Shortcuts still work.
-    let id: String?
-    /// Several habit ids in one command, for a multi-select Shortcut.
-    let ids: [String]?
-    let action: String
 }
