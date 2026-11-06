@@ -75,6 +75,33 @@ final class ContributionDataTests: XCTestCase {
         XCTAssertTrue(contributions.days.count % 7 == 0) // week-aligned grid
     }
 
+    func testRemovedHabitIsExcludedFromPreviousDayGraphTotals() {
+        let context = makeContext()
+        let kept = Habit(name: "Read", schedule: .daily)
+        let removed = Habit(name: "Run", schedule: .daily)
+        kept.createdAt = startOfDay(daysAgo: 2)
+        removed.createdAt = startOfDay(daysAgo: 2)
+        let keptCompletion = HabitCompletion(day: startOfDay(daysAgo: 1), habit: kept)
+        let removedCompletion = HabitCompletion(day: startOfDay(daysAgo: 1), habit: removed)
+        context.insert(kept)
+        context.insert(removed)
+        context.insert(keptCompletion)
+        context.insert(removedCompletion)
+        removed.isDeleted = true
+        removedCompletion.isDeleted = true
+
+        let contributions = makeContributions(
+            habits: [kept, removed],
+            range: .trailingWeeks(2)
+        )
+        let previousDayCell = contributions.days.first {
+            calendar.isDate($0.date, inSameDayAs: startOfDay(daysAgo: 1))
+        }
+
+        XCTAssertEqual(previousDayCell?.count, 1)
+        XCTAssertEqual(previousDayCell?.scheduled, 1)
+    }
+
     func testTimesPerWeekWeeklyCount() throws {
         let context = makeContext()
         let habit = Habit(name: "Gym", schedule: .timesPerWeek(3))

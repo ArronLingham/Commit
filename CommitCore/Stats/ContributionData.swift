@@ -136,6 +136,8 @@ public func makeContributions(
     let gridStart = calendar.startOfWeek(for: primaryStart)
     let gridEnd = calendar.endOfWeek(for: primaryEnd)
 
+    // Exclude deleted habits from the count and denominator so historical graph
+    // values no longer include habits the user has removed.
     let active = habits.filter { !$0.isArchived && !$0.isDeleted }
     let denom = max(active.count, 1)
 

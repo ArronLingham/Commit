@@ -67,7 +67,8 @@ account requirements beyond having Xcode installed.
 - **Hover tooltips** — hovering a graph cell shows "X of Y completed" for
   that day.
 - **Configurable layout** — choose a Today / All toggle or a collapsible list
-  of all remaining habits.
+  of all remaining habits. In edit mode, drag a habit across the list to reorder;
+  rows snap into place as they move.
 - **Habit colours** and an on-brand app icon.
 
 ## Architecture
@@ -97,11 +98,11 @@ the main app, the menu bar, and the `AppIntent` without duplication.
 | `id`, `name`, `iconName`, `colorHex` | Identity and display. |
 | `scheduleRaw`, `weekdays`, `targetPerWeek` | The schedule, encoded (see below). |
 | `sortOrder` | Manual ordering. |
-| `isArchived` / `isDeleted` | Soft-delete flags — filtered out of every query rather than hard-deleted, so deletions are consistent everywhere a habit could be referenced. |
+| `isArchived` / `isDeleted` | Archived and soft-deleted flags. Removed habits remain as sync tombstones but are excluded from active lists and contribution history. |
 | `completions` | A `@Relationship` to `HabitCompletion` (one row per completed day), cascade-deleted with the habit. |
 
 `HabitCompletion` (`CommitCore/Models/HabitCompletion.swift`) is just a `day`
-date plus an `isDeleted` tombstone flag and a back-reference to its habit.
+date plus an `isDeleted` tombstone flag and a back-reference to its habit. Removing a habit tombstones its completions too, so they no longer affect historical graph totals.
 
 ### Schedule encoding (the key trick)
 
@@ -146,7 +147,7 @@ the menu bar, and the Shortcuts intent always mutate state the same way:
   to play the check sound).
 - `addHabit(...)` — inserts a new habit at the end of the sort order.
 - `saveEdits(to:)` — stamps `updatedAt` after editing a habit's fields.
-- `softDelete(_:)` — tombstones a habit and all its completions.
+- `softDelete(_:)` — tombstones a habit and its completions; removed habits no longer count in historical contribution graphs.
 
 ### Contribution graph & stats
 

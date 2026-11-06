@@ -965,7 +965,9 @@ private struct HabitReorderDropDelegate: DropDelegate {
 
         var reordered = habits
         reordered.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
-        HabitActions.reorder(reordered, in: context)
+        withAnimation(.snappy(duration: 0.18)) {
+            HabitActions.reorder(reordered, in: context)
+        }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }

@@ -88,11 +88,11 @@ public enum HabitActions {
         try? context.save()
     }
 
-    /// Soft-delete (tombstone) a habit and its completions so they disappear from the
-    /// app and menu bar consistently.
+    /// Tombstone a habit and its completions so it disappears from active lists and graph history.
     public static func softDelete(_ habit: Habit, in context: ModelContext) {
         habit.isDeleted = true
         habit.updatedAt = Date()
+        // Mark the relationship rows even when it was just populated in memory.
         for completion in habit.completions ?? [] where !completion.isDeleted {
             completion.isDeleted = true
             completion.updatedAt = Date()
