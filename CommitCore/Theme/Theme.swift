@@ -3,7 +3,6 @@ import SwiftUI
 /// Minimalist palette + the GitHub-style 5-step intensity scale.
 public enum Theme {
     public static let defaultAccentHex = "#39D353"
-    public static let accentColorHexKey = "accentColorHex"
 
     public static var defaultAccent: Color { Color(hex: defaultAccentHex) ?? .green }
 
@@ -82,16 +81,7 @@ public enum Theme {
         }
     }
 
-    /// The user's chosen accent, read from the shared App Group defaults so the widget
-    /// matches the app.
-    public static func currentAccent() -> Color {
-        let hex = CommitConstants.sharedDefaults.string(forKey: accentColorHexKey) ?? defaultAccentHex
-        return Color(hex: hex) ?? defaultAccent
-    }
 
-    public static func setAccent(hex: String) {
-        CommitConstants.sharedDefaults.set(hex, forKey: accentColorHexKey)
-    }
 }
 
 /// How the contribution graph colours its cells. User-selectable in Settings.

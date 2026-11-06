@@ -10,6 +10,10 @@ struct CommitApp: App {
     private var showMenuBarIcon = true
 
     init() {
+        // Map the removed Upcoming option to the complete Other habits list.
+        if CommitConstants.sharedDefaults.string(forKey: OtherHabitsStyle.storageKey) == "upcoming" {
+            CommitConstants.sharedDefaults.set(OtherHabitsStyle.collapsible.rawValue, forKey: OtherHabitsStyle.storageKey)
+        }
         // Re-arm the daily reminder for returning users (no-op / no prompt if disabled).
         ReminderScheduler.refresh()
         // Resume iPhone sync (watches the shared iCloud Drive folder) if the user enabled it.

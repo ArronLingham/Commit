@@ -8,9 +8,7 @@ struct HabitDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
-    private var accentHex = Theme.defaultAccentHex
-    private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
+    private var accent: Color { Theme.defaultAccent }
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
 

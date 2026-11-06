@@ -14,9 +14,7 @@ struct MenuBarView: View {
     @Query(filter: #Predicate<Habit> { !$0.isArchived && !$0.isDeleted }, sort: \Habit.sortOrder)
     private var habits: [Habit]
 
-    @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
-    private var accentHex = Theme.defaultAccentHex
-    private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
+    private var accent: Color { Theme.defaultAccent }
     // Observed only so the popover re-renders when Tester Mode changes the simulated date.
     @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
     private var testerEnabled = false

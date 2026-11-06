@@ -7,16 +7,13 @@ import AppKit
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
 
-    @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
-    private var accentHex = Theme.defaultAccentHex
-
     @AppStorage(ReminderScheduler.enabledKey, store: CommitConstants.sharedDefaults)
     private var reminderEnabled = false
     @State private var reminderTime = Date()
     @State private var notifStatus: UNAuthorizationStatus = .notDetermined
 
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
-    private var otherHabitsStyle: OtherHabitsStyle = .upcoming
+    private var otherHabitsStyle: OtherHabitsStyle = .collapsible
     @AppStorage(showMenuBarIconKey, store: CommitConstants.sharedDefaults)
     private var showMenuBarIcon = true
 
@@ -28,10 +25,6 @@ struct SettingsView: View {
     private var phoneSyncEnabled = false
     @ObservedObject private var phoneSync = PhoneSyncService.shared
     @State private var showingPhoneSetup = false
-    @State private var showingPauseAllSheet = false
-
-    @AppStorage(AppearanceStyle.storageKey, store: CommitConstants.sharedDefaults)
-    private var appearanceStyle: AppearanceStyle = .minimalist
 
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
@@ -42,23 +35,17 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            interfaceSection
             appearanceSection
-            vacationSection
             reminderSection
             layoutSection
             menuBarSection
             phoneSyncSection
             if testerModeEnabled { testerSection }
-            aboutSection
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .sheet(isPresented: $showingPhoneSetup) {
             PhoneSetupView(folderName: phoneSync.folderName)
-        }
-        .sheet(isPresented: $showingPauseAllSheet) {
-            PauseAllSheet()
         }
         .onAppear {
             reminderTime = Calendar.current.date(
@@ -139,7 +126,7 @@ struct SettingsView: View {
         } header: {
             Text("Layout")
         } footer: {
-            Text("How habits that aren't due today appear in Minimalist style. Liquid Glass uses its sidebar instead.")
+            Text("Choose how to view habits that aren't on today's list.")
         }
     }
 
@@ -221,51 +208,6 @@ struct SettingsView: View {
         AppClock.overrideDate = date
     }
 
-    // MARK: Interface
-    
-    private var vacationSection: some View {
-        Section {
-            if let status = Vacation.statusText() {
-                LabeledContent("Status", value: status)
-                Button("Resume All Habits") {
-                    HabitActions.resumeAll(in: SharedModelContainer.shared.mainContext)
-                    ReminderScheduler.refresh()   // re-arm the nightly reminder
-                }
-            } else {
-                Button("Pause All Habits…") {
-                    showingPauseAllSheet = true
-                }
-                // Tester Mode only rewinds completions, so a pause-all made while testing would
-                // be permanent real data — and moving the simulated date mid-vacation corrupts
-                // the window `resumeAll` writes back.
-                .disabled(testerModeEnabled)
-            }
-        } header: {
-            Text("Vacation Mode")
-        } footer: {
-            Text(
-                Vacation.isActive()
-                    ? "Paused days stay neutral — they won't count as missed or break your streaks."
-                    : "Pause all habits at once. Useful for taking a break or going on vacation."
-            )
-        }
-    }
-
-    private var interfaceSection: some View {
-        Section {
-            Picker("Window style", selection: $appearanceStyle) {
-                ForEach(AppearanceStyle.allCases) { style in
-                    Text(style.label).tag(style)
-                }
-            }
-            .pickerStyle(.segmented)
-        } header: {
-            Text("Interface")
-        } footer: {
-            Text("\(appearanceStyle.blurb) Changes apply immediately.")
-        }
-    }
-
     // MARK: Appearance
 
     private var appearanceSection: some View {
@@ -276,45 +218,19 @@ struct SettingsView: View {
                 }
             }
             if colorScheme == .informative { thresholdControls }
-            accentSwatches
         } header: {
             Text("Appearance")
         } footer: {
             Text(colorScheme == .githubGreen
-                 ? "GitHub style shades each day by how much you completed, in the accent colour you pick."
+                 ? "GitHub style shades each day by how much you completed."
                  : "Choose how many missed habits turn a day yellow or red. Days with none missed are green; days with no habits due stay neutral.")
-        }
-    }
-
-    /// The app accent also supplies the hue for the GitHub-style graph.
-    private var accentSwatches: some View {
-        LabeledContent(colorScheme == .githubGreen ? "Graph and app accent" : "App accent") {
-            HStack(spacing: 12) {
-                ForEach(Theme.presetAccents, id: \.self) { hex in
-                    Circle()
-                        .fill(Color(hex: hex) ?? .gray)
-                        .frame(width: 28, height: 28)
-                        .overlay(Circle().strokeBorder(.primary, lineWidth: accentHex == hex ? 2.5 : 0))
-                        .onTapGesture {
-                            accentHex = hex
-                            Theme.setAccent(hex: hex)
-                        }
-                }
-            }
-            .padding(.vertical, 4)
         }
     }
 
     private var thresholdControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Stepper("Yellow starts at \(yellowStartsAt) missed", value: $yellowStartsAt, in: 1...99)
-                .onChange(of: yellowStartsAt) { _, newValue in
-                    redStartsAt = max(redStartsAt, newValue + 1)
-                }
-            Stepper("Red starts at \(redStartsAt) missed", value: $redStartsAt, in: 2...100)
-                .onChange(of: redStartsAt) { _, newValue in
-                    yellowStartsAt = min(yellowStartsAt, newValue - 1)
-                }
+            ThresholdRangeSlider(yellow: $yellowStartsAt, red: $redStartsAt)
+                .frame(height: 44)
             HStack(spacing: 6) {
                 thresholdLabel("Green", color: InformativeThresholds.allDoneColor,
                                range: "0–\(yellowStartsAt - 1)")
@@ -336,17 +252,4 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: About
-
-    private var aboutSection: some View {
-        Section("About") {
-            LabeledContent("Version", value: appVersion)
-        }
-    }
-
-    private var appVersion: String {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "\(v) (\(b))"
-    }
 }

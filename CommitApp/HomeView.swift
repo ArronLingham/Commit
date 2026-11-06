@@ -10,9 +10,8 @@ struct HomeView: View {
     @Query(filter: #Predicate<Habit> { !$0.isArchived && !$0.isDeleted }, sort: \Habit.sortOrder)
     private var habits: [Habit]
 
-    @AppStorage(Theme.accentColorHexKey, store: CommitConstants.sharedDefaults)
-    private var accentHex = Theme.defaultAccentHex
-    private var accent: Color { Color(hex: accentHex) ?? Theme.defaultAccent }
+    private let accentHex = Theme.defaultAccentHex
+    private var accent: Color { Theme.defaultAccent }
 
     enum Span: String, CaseIterable, Identifiable {
         case week = "Week", month = "Month", year = "Year"
@@ -21,25 +20,6 @@ struct HomeView: View {
     enum Scope: String, CaseIterable, Identifiable {
         case today = "Today", all = "All"
         var id: String { rawValue }
-    }
-    /// Sidebar destinations for the macOS (System Settings-style) layout.
-    enum MacSection: String, CaseIterable, Identifiable {
-        case today, all, paused
-        var id: String { rawValue }
-        var title: String {
-            switch self {
-            case .today:  return "Today"
-            case .all:    return "All Habits"
-            case .paused: return "Paused"
-            }
-        }
-        var icon: String {
-            switch self {
-            case .today:  return "calendar"
-            case .all:    return "checklist"
-            case .paused: return "pause.circle"
-            }
-        }
     }
     @State private var span: Span = .month
     @State private var scope: Scope = .today
@@ -55,9 +35,8 @@ struct HomeView: View {
     @State private var draggingHabit: Habit?
     @State private var detailHabit: Habit?
     @State private var pausingHabit: Habit?
-    @State private var macSection: MacSection = .today
     @AppStorage(OtherHabitsStyle.storageKey, store: CommitConstants.sharedDefaults)
-    private var otherHabitsStyle: OtherHabitsStyle = .upcoming
+    private var otherHabitsStyle: OtherHabitsStyle = .collapsible
     @AppStorage(GraphColorScheme.storageKey, store: CommitConstants.sharedDefaults)
     private var colorScheme: GraphColorScheme = .githubGreen
     // Observe cutoff changes so every graph span updates immediately.
@@ -65,10 +44,6 @@ struct HomeView: View {
     private var yellowStartsAt = InformativeThresholds.defaultYellow
     @AppStorage(InformativeThresholds.redKey, store: CommitConstants.sharedDefaults)
     private var redStartsAt = InformativeThresholds.defaultRed
-    // The overall window look — minimalist single page vs. macOS sidebar layout.
-    @AppStorage(AppearanceStyle.storageKey, store: CommitConstants.sharedDefaults)
-    private var appearanceRaw = AppearanceStyle.minimalist.rawValue
-    private var appearance: AppearanceStyle { AppearanceStyle(rawValue: appearanceRaw) ?? .minimalist }
     // Observed only so the page re-renders when Tester Mode changes the simulated date.
     @AppStorage(AppClock.enabledKey, store: CommitConstants.sharedDefaults)
     private var testerEnabled = false
@@ -121,15 +96,9 @@ struct HomeView: View {
         habits.filter { $0.belongsOnList(for: viewingDate) }
     }
 
-    private var upcomingHabits: [Habit] {
-        habits.filter { !$0.isPaused() && !$0.schedule.isScheduled(on: AppClock.now) }
-            .sorted { ($0.schedule.nextDate() ?? .distantFuture) < ($1.schedule.nextDate() ?? .distantFuture) }
-    }
-
-    /// Habits currently snoozed — shown only in the collapsed "Paused" section.
-    private var pausedHabits: [Habit] {
-        habits.filter { $0.isPaused() }
-            .sorted { ($0.pausedUntil ?? .distantFuture) < ($1.pausedUntil ?? .distantFuture) }
+    private var otherHabits: [Habit] {
+        let visibleIDs = Set(visibleHabits.map(\.id))
+        return habits.filter { !visibleIDs.contains($0.id) }
     }
 
     private var contributions: Contributions {
@@ -147,12 +116,7 @@ struct HomeView: View {
         return makeContributions(habits: habits, range: range)
     }
 
-    var body: some View {
-        switch appearance {
-        case .minimalist: minimalistBody
-        case .macOS:      macBody
-        }
-    }
+    var body: some View { minimalistBody }
 
     // MARK: Minimalist layout (the original single page)
 
@@ -185,93 +149,6 @@ struct HomeView: View {
         .onChange(of: testerOverride) { _, _ in viewDate = nil }
     }
 
-    // MARK: macOS layout (System Settings-style sidebar)
-
-    private var macBody: some View {
-        NavigationSplitView {
-            List(selection: macSelectionBinding) {
-                ForEach(MacSection.allCases) { section in
-                    Label(section.title, systemImage: section.icon).tag(section)
-                }
-            }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 190, ideal: 212, max: 260)
-            .navigationTitle("Commit")
-        } detail: {
-            NavigationStack {
-                ScrollView {
-                    macDetail
-                        .padding(24)
-                        .frame(maxWidth: 720, alignment: .leading)
-                        .frame(maxWidth: .infinity)
-                }
-                .navigationTitle(macSection == .today && !isViewingToday ? dayLabel : macSection.title)
-                .toolbar {
-                    spanToolbar
-                    vacationToolbar
-                    macEditToolbar
-                }
-                .navigationDestination(isPresented: detailHabitBinding) {
-                    if let habit = detailHabit { HabitDetailView(habit: habit) }
-                }
-            }
-        }
-        .sheet(item: $editing) { HabitEditView(habit: $0) }
-        .sheet(item: $pausingHabit) { PauseSheet(habit: $0) }
-        .sheet(isPresented: $showingPauseAll) { PauseAllSheet() }
-        // When "today" itself moves, an off-today view can flip from past to future (silently
-        // locking check-offs) or land on the new today while `viewDate` is still set. Snapping
-        // back is the only unambiguous answer.
-        .onChange(of: testerEnabled) { _, _ in viewDate = nil }
-        .onChange(of: testerOverride) { _, _ in viewDate = nil }
-    }
-
-    /// The detail pane for the macOS layout, driven by the sidebar selection. Reuses the same
-    /// graph, rows, and quick-add as the minimalist page — only the surrounding chrome differs.
-    @ViewBuilder
-    private var macDetail: some View {
-        switch macSection {
-        case .today:
-            VStack(alignment: .leading, spacing: 20) {
-                graphSection
-                    .padding(20)
-                    .frame(maxWidth: .infinity)
-                    .surface(appearance, cornerRadius: 16)
-                vacationBanner
-                daySectionView
-                quickAdd
-            }
-        case .all:
-            VStack(alignment: .leading, spacing: 12) {
-                if isEditing {
-                    editList
-                    quickAdd
-                } else {
-                    allHabitsRows
-                    quickAdd
-                }
-            }
-        case .paused:
-            if pausedHabits.isEmpty {
-                ContentUnavailableView(
-                    "Nothing paused",
-                    systemImage: "pause.circle",
-                    description: Text("Habits you snooze will appear here.")
-                )
-                .frame(maxWidth: .infinity)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(pausedHabits) { pausedRow($0) }
-                }
-            }
-        }
-    }
-
-    /// Single-selection binding for the sidebar (List wants an optional selection).
-    private var macSelectionBinding: Binding<MacSection?> {
-        Binding(get: { macSection }, set: { if let value = $0 { macSection = value } })
-    }
-
     private var detailHabitBinding: Binding<Bool> {
         Binding(get: { detailHabit != nil }, set: { if !$0 { detailHabit = nil } })
     }
@@ -283,30 +160,6 @@ struct HomeView: View {
                 ForEach(Span.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.menu)
-        }
-    }
-
-    /// The macOS layout never renders `habitsHeader`, so without this the sidebar layout would
-    /// have no way to *start* a vacation except Settings.
-    @ToolbarContentBuilder
-    private var vacationToolbar: some ToolbarContent {
-        ToolbarItem(placement: .automatic) { vacationButton }
-    }
-
-    /// Edit toggle for the macOS "All Habits" pane (minimalist keeps its in-content pencil).
-    @ToolbarContentBuilder
-    private var macEditToolbar: some ToolbarContent {
-        if macSection == .all {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    // Edit mode manages every habit and has no per-day meaning, so entering it
-                    // snaps back to today rather than leaving a stale date scoping the page.
-                    withAnimation(.snappy) { isEditing.toggle(); if isEditing { viewDate = nil } }
-                } label: {
-                    Image(systemName: isEditing ? "checkmark.circle.fill" : "square.and.pencil")
-                }
-                .help(isEditing ? "Done editing" : "Edit habits")
-            }
         }
     }
 
@@ -580,7 +433,7 @@ struct HomeView: View {
             if isEditing {
                 Text("Edit habits")
                     .font(.headline)
-            } else if otherHabitsStyle == .toggle && appearance == .minimalist && isViewingToday {
+            } else if otherHabitsStyle == .toggle && isViewingToday {
                 // Hidden off-today: `Scope.today` would mean "the viewed day's habits", two
                 // different axes sharing the word Today. `scope` is left untouched, so it comes
                 // back exactly as it was.
@@ -661,7 +514,7 @@ struct HomeView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity)
-            .surface(appearance, cornerRadius: 10, minimalOpacity: 0.10)
+            .surface(cornerRadius: 10, opacity: 0.10)
         }
     }
 
@@ -675,18 +528,16 @@ struct HomeView: View {
             daySectionView
         } else {
             switch otherHabitsStyle {
-            case .upcoming:
-                daySectionView
-                if !upcomingHabits.isEmpty || !pausedHabits.isEmpty { upcomingSection }
             case .toggle:
                 if scope == .today { dayRows } else { allHabitsRows }
             case .collapsible:
                 daySectionView
-                if !upcomingHabits.isEmpty || !pausedHabits.isEmpty {
-                    DisclosureGroup("Other habits (\(upcomingHabits.count + pausedHabits.count))") {
+                if !otherHabits.isEmpty {
+                    DisclosureGroup("Other habits (\(otherHabits.count))") {
                         VStack(alignment: .leading, spacing: 8) {
-                            ForEach(upcomingHabits) { infoRow($0) }
-                            ForEach(pausedHabits) { pausedRow($0) }
+                            ForEach(otherHabits) { habit in
+                                if habit.isPaused() { pausedRow(habit) } else { infoRow(habit) }
+                            }
                         }
                     }
                 }
@@ -728,7 +579,6 @@ struct HomeView: View {
         .padding(.vertical, 4)
         .opacity(0.7)
         .contextMenu { editDeleteMenu(habit) }
-        .rowHover(appearance == .macOS)
     }
 
     // MARK: Edit mode
@@ -801,7 +651,7 @@ struct HomeView: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
-        .surface(appearance, cornerRadius: 8)
+        .surface(cornerRadius: 8)
         .contentShape(Rectangle())
     }
 
@@ -887,16 +737,6 @@ struct HomeView: View {
         }
     }
 
-    private var upcomingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Upcoming")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            ForEach(upcomingHabits) { infoRow($0) }
-            ForEach(pausedHabits) { pausedRow($0) }
-        }
-    }
-
     /// A checkable habit row for the day being viewed. Tapping the name opens progress; the
     /// circle toggles that day's completion, which is what makes backfilling a missed day work.
     private func checkableRow(_ habit: Habit) -> some View {
@@ -918,7 +758,6 @@ struct HomeView: View {
             }
         )
         .contextMenu { editDeleteMenu(habit) }
-        .rowHover(appearance == .macOS)
     }
 
     /// A non-checkable row for habits not due today: shows the next occurrence. Tap opens progress.
@@ -945,7 +784,6 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .contextMenu { editDeleteMenu(habit) }
-        .rowHover(appearance == .macOS)
     }
 
     @ViewBuilder
@@ -1004,7 +842,7 @@ struct HomeView: View {
                 .disabled(newHabitName.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         .padding(10)
-        .surface(appearance, cornerRadius: 10, minimalOpacity: 0.10)
+        .surface(cornerRadius: 10, opacity: 0.10)
     }
 
     private func addHabit() {

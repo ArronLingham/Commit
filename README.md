@@ -66,11 +66,9 @@ account requirements beyond having Xcode installed.
 - **Sound feedback** — a satisfying click when you check a habit off.
 - **Hover tooltips** — hovering a graph cell shows "X of Y completed" for
   that day.
-- **Configurable layout** — three ways to see habits that aren't due today,
-  and three ways the "next occurrence" date is worded, both chosen in
-  Settings.
-- **Custom accent colour** and an on-brand app icon (a dark rounded square
-  with its own mini contribution grid).
+- **Configurable layout** — choose a Today / All toggle or a collapsible list
+  of all remaining habits.
+- **Habit colours** and an on-brand app icon.
 
 ## Architecture
 
@@ -182,10 +180,8 @@ type:
 
 ### Theme
 
-`CommitCore/Theme/Theme.swift` holds the accent colour (persisted as a hex
-string in `UserDefaults`, with 8 presets) and the 5-step intensity palette
-used by the graph (`Theme.cellColor(level:accent:)`). A `Color(hex:)`
-initializer/parser lives alongside it.
+`CommitCore/Theme/Theme.swift` defines the graph colours and the default app
+colour. Individual habits can have their own colours.
 
 ### Reminders
 
@@ -247,14 +243,13 @@ The whole app is one page (`CommitApp/HomeView.swift`) — no sidebar, no tabs:
 
 The graph can use GitHub-style intensity or green/yellow/red by missed habits.
 In Settings, choose the missed-habit count where yellow and red begin. The
-existing defaults remain 2 and 4 missed habits. The app accent has 8 presets.
+existing defaults remain 2 and 4 missed habits. Drag the two handles to change them.
 
 - **Reminder** — enable and choose a time for the daily notification.
-- **Other habits** — in Minimalist style, choose how non-today habits appear.
+- **Other habits** — choose a Today / All toggle or a collapsible list of all remaining habits.
 - **Menu Bar** — show or hide the menu bar icon.
 - **Tester Mode** — shown only while an existing test session is active, so it
   can be ended without exposing a development control in normal use.
-- **About** — the app version from the bundle's `Info.plist`.
 
 ## Notable bugs fixed along the way
 
