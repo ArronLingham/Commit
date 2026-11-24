@@ -23,6 +23,8 @@ public final class Habit {
     public var weekdays: [Int] = []
     /// Target completions per week for `.timesPerWeek` schedules.
     public var targetPerWeek: Int = 3
+    /// Day of month when a `.timesPerMonth` habit's completion count resets (1...31).
+    public var monthResetDay: Int = 1
 
     public var createdAt: Date = Date()
     public var sortOrder: Int = 0

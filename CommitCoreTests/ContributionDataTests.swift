@@ -102,6 +102,30 @@ final class ContributionDataTests: XCTestCase {
         XCTAssertEqual(previousDayCell?.scheduled, 1)
     }
 
+    func testTimesPerMonthCountUsesCustomResetDay() {
+        var local = Calendar(identifier: .gregorian)
+        local.timeZone = .current
+        func date(_ day: Int) -> Date {
+            local.date(from: DateComponents(year: 2026, month: 2, day: day))!
+        }
+
+        let habit = Habit(name: "Read", schedule: .timesPerMonth(10))
+        habit.monthResetDay = 15
+        habit.completions = [
+            HabitCompletion(day: date(14), habit: habit),
+            HabitCompletion(day: date(15), habit: habit),
+            HabitCompletion(day: date(19), habit: habit)
+        ]
+
+        XCTAssertEqual(habit.monthlyCompletionCount(asOf: date(20), calendar: local), 2)
+        XCTAssertEqual(habit.monthlyCompletionCount(asOf: date(14), calendar: local), 1)
+    }
+
+    func testTimesPerMonthResetDayDefaultsToFirst() {
+        let habit = Habit(name: "Read", schedule: .timesPerMonth(10))
+        XCTAssertEqual(habit.monthResetDay, 1)
+    }
+
     func testTimesPerWeekWeeklyCount() throws {
         let context = makeContext()
         let habit = Habit(name: "Gym", schedule: .timesPerWeek(3))

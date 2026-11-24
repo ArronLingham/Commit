@@ -240,14 +240,24 @@ public extension Habit {
         return completedDaySet(calendar: calendar).filter { $0 >= weekStart && $0 <= weekEnd }.count
     }
 
-    /// Completions within the calendar month containing `date`.
+    /// Completions within this habit's current monthly target period.
     func monthlyCompletionCount(asOf date: Date = AppClock.now, calendar: Calendar = .current) -> Int {
-        let comps = calendar.dateComponents([.year, .month], from: date)
-        guard let monthStart = calendar.date(from: comps),
-              let range = calendar.range(of: .day, in: .month, for: monthStart),
-              let monthEnd = calendar.date(byAdding: .day, value: range.count - 1, to: monthStart)
+        let resetDay = min(max(monthResetDay, 1), 31)
+        let components = calendar.dateComponents([.year, .month], from: date)
+        guard let year = components.year, let month = components.month,
+              let currentMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+              let currentRange = calendar.range(of: .day, in: .month, for: currentMonth)
         else { return 0 }
-        return completedDaySet(calendar: calendar).filter { $0 >= monthStart && $0 <= monthEnd }.count
+        let currentReset = calendar.date(byAdding: .day, value: min(resetDay, currentRange.count) - 1, to: currentMonth)!
+        let periodStart: Date
+        if date >= currentReset {
+            periodStart = currentReset
+        } else {
+            let previousMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth)!
+            let previousRange = calendar.range(of: .day, in: .month, for: previousMonth)!
+            periodStart = calendar.date(byAdding: .day, value: min(resetDay, previousRange.count) - 1, to: previousMonth)!
+        }
+        return completedDaySet(calendar: calendar).filter { $0 >= periodStart && $0 <= date }.count
     }
 
     /// For `.timesPerWeek` / `.timesPerMonth` habits, whether this period's target has already

@@ -17,6 +17,7 @@ struct HabitEditView: View {
     @State private var selectedWeekdays: Set<Int>
     @State private var timesPerWeek: Int
     @State private var timesPerMonth: Int
+    @State private var monthResetDay: Int
     @State private var selectedDaysOfMonth: Set<Int>
     @State private var yearlyMonth: Int
     @State private var yearlyDay: Int
@@ -51,6 +52,7 @@ struct HabitEditView: View {
         } else {
             _timesPerMonth = State(initialValue: 10)
         }
+        _monthResetDay = State(initialValue: habit?.monthResetDay ?? 1)
         if case .monthly(let days) = schedule {
             _selectedDaysOfMonth = State(initialValue: days)
         } else {
@@ -100,6 +102,11 @@ struct HabitEditView: View {
                         Stepper("\(timesPerWeek)× per week", value: $timesPerWeek, in: 1...7)
                     } else if scheduleKind == .timesPerMonth {
                         Stepper("\(timesPerMonth)× per month", value: $timesPerMonth, in: 1...31)
+                        Picker("Reset on day", selection: $monthResetDay) {
+                            ForEach(1...31, id: \.self) { day in
+                                Text("\(day)").tag(day)
+                            }
+                        }
                     } else if scheduleKind == .monthly {
                         dayOfMonthPicker
                     } else if scheduleKind == .yearly {
@@ -233,6 +240,7 @@ struct HabitEditView: View {
             habit.iconName = iconName
             habit.colorHex = colorHex
             habit.schedule = currentSchedule()
+            habit.monthResetDay = monthResetDay
             HabitActions.saveEdits(to: habit, in: context)
         } else {
             let new = HabitActions.addHabit(
@@ -242,7 +250,8 @@ struct HabitEditView: View {
                 schedule: currentSchedule(),
                 in: context
             )
-            _ = new
+            new.monthResetDay = monthResetDay
+            try? context.save()
         }
         dismiss()
     }
